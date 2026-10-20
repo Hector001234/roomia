@@ -1,0 +1,27 @@
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+// Section 24 & CAL-005 / CAL-006: Search Latency P95 <= 1500ms & Error Rate < 0.1%
+export const options = {
+  stages: [
+    { duration: '2m', target: 50 },  // Nominal load: 50 concurrent virtual users
+    { duration: '3m', target: 150 }, // Peak load: 150 RPS
+    { duration: '1m', target: 0 },
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<=1500'],
+    http_req_failed: ['rate<0.001'],
+  },
+};
+
+export default function () {
+  const url = 'http://localhost:8000/api/v1/listings/search?city=Toluca&guests=2&check_in=2026-12-10&check_out=2026-12-15';
+  const res = http.get(url);
+
+  check(res, {
+    'status is 200 OK': (r) => r.status === 200,
+    'payload contains data array': (r) => Array.isArray(r.json('data')),
+  });
+
+  sleep(0.5);
+}

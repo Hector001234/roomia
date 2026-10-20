@@ -1,0 +1,125 @@
+openapi: 3.0.3
+info:
+  title: Roomia Core REST API
+  version: 3.1.0
+  description: >-
+    Formal OpenAPI 3.0 contract for the Roomia platform (CAL-018 compliance).
+    All protected routes require an asymmetric RSA-2048 Bearer JWT.
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local Development & Audit Environment
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+paths:
+  /auth/register:
+    post:
+      summary: Self-register a new user (RF-01 / CPF-01)
+      responses:
+        '201':
+          description: User registered with Argon2id hash
+        '422':
+          description: RFC 5322 email or boundary validation error (CPF-01)
+  /auth/login:
+    post:
+      summary: Authenticate user and issue RSA-2048 JWT (RQ-SEG-002)
+      responses:
+        '200':
+          description: JWT Access Token (60m TTL) and Single-Use Refresh Token
+        '401':
+          description: Invalid credentials
+        '429':
+          description: Account temporarily locked after 5 failed attempts
+  /listings:
+    get:
+      summary: List active properties
+      responses:
+        '200':
+          description: Paginated catalog of listings
+    post:
+      summary: Publish a new property with up to 15 WebP photos (RF-02 / CPF-03)
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Property created and images optimized to WebP
+        '403':
+          description: RBAC denial (Only HOST role allowed)
+        '422':
+          description: Invalid geographic coordinates or payload
+  /listings/search:
+    get:
+      summary: Multi-criteria indexed search with Redis cache (RF-03 / CPF-04 / RQ-PERF-01)
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: guests
+          in: query
+          schema:
+            type: integer
+        - name: check_in
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: check_out
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Matching available properties (or empty array [] per CPF-04)
+  /bookings:
+    post:
+      summary: Create atomic reservation with pessimistic lock SELECT FOR UPDATE (RF-04 / RQ-FUNC-01)
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Booking locked with UUID v4 and SHA-256 integrity hash
+        '409':
+          description: Conflict - Overlapping dates already locked by concurrent transaction (CP-CONC-01)
+  /checkout:
+    post:
+      summary: Process tokenized payment intent via Stripe (RF-05 / CPF-02)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Payment succeeded and booking confirmed
+        '402':
+          description: Payment Required - Card declined (e.g., insufficient_funds in CPF-02), dates released
+  /webhooks/stripe:
+    post:
+      summary: Handle cryptographically signed Stripe webhooks (CP-INT-04 / CP-INT-08)
+      responses:
+        '200':
+          description: Webhook verified and processed
+        '400':
+          description: Invalid HMAC signature
+  /reviews:
+    post:
+      summary: Submit a 1-5 star review for a completed stay (M05 / CPF-05)
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Review published
+        '403':
+          description: Forbidden - Unverified stay (No COMPLETED booking found per CPF-05)
+  /audit:
+    get:
+      summary: Inspect immutable audit log and verify SHA-256 chain (RF-06 / RQ-AUD-01)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Audit trail entries and cryptographic chain verification status
+        '403':
+          description: Forbidden - Restricted to ADMIN / AUDITOR role

@@ -1,0 +1,74 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: roomia-backend
+    restart: unless-stopped
+    env_file:
+      - .env.example
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - roomia-network
+
+  frontend:
+    image: node:20-alpine
+    container_name: roomia-frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host"
+    networks:
+      - roomia-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: roomia-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: roomia_db
+      MYSQL_USER: roomia_app_user
+      MYSQL_PASSWORD: local_dev_password_only
+      MYSQL_ROOT_PASSWORD: local_root_password_only
+    ports:
+      - "3306:3306"
+    command: --default-authentication-plugin=mysql_native_password --transaction-isolation=READ-COMMITTED
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - roomia-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: roomia-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - roomia-network
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: roomia-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    depends_on:
+      - backend
+    networks:
+      - roomia-network
+
+volumes:
+  mysql-data:
+
+networks:
+  roomia-network:
+    driver: bridge
