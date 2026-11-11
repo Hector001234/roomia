@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use RuntimeException;
-
 /**
- * Section 12 (RF-01), RQ-SEG-001 (Argon2id) & RQ-SEG-002 (Asymmetric JWT 60m TTL + Redis Refresh).
+ * Section 12 (RF-01), RQ-SEG-001 (Argon2id) & RQ-SEG-002 (Asymmetric JWT 60m TTL).
+ * Pillar 2 Compliance: Never exposes password_hash or secrets in DTO responses.
  */
 final class AuthService
 {
@@ -23,23 +22,26 @@ final class AuthService
         $normalizedEmail = strtolower(trim($email));
         $passwordHash = $this->hashPassword($plainPassword);
 
-        $user = [
+        $record = [
             'id' => count($this->usersByEmail) + 1,
+            'uuid' => $this->generateUuidV4(),
             'name' => htmlspecialchars($name, ENT_QUOTES, 'UTF-8'),
             'email' => $normalizedEmail,
             'password_hash' => $passwordHash,
             'role' => $role,
+            'deleted_at' => null,
         ];
-        $this->usersByEmail[$normalizedEmail] = $user;
-        return $user;
+        $this->usersByEmail[$normalizedEmail] = $record;
+
+        return $this->toPublicUserDto($record);
     }
 
     public function hashPassword(string $plainPassword): string
     {
         return password_hash($plainPassword, PASSWORD_ARGON2ID, [
-            'memory_cost' => 65536,
-            'time_cost' => 4,
-            'threads' => 2,
+            'memory_cost' => (int) (getenv('ARGON2_MEMORY') ?: 65536),
+            'time_cost' => (int) (getenv('ARGON2_TIME') ?: 4),
+            'threads' => (int) (getenv('ARGON2_THREADS') ?: 2),
         ]);
     }
 
@@ -53,7 +55,7 @@ final class AuthService
         }
 
         $user = $this->usersByEmail[$normalizedEmail] ?? null;
-        if ($user === null || !password_verify($plainPassword, $user['password_hash'])) {
+        if ($user === null || $user['deleted_at'] !== null || !password_verify($plainPassword, $user['password_hash'])) {
             $this->failedAttempts[$normalizedEmail] = $attempts + 1;
             return ['status' => 401, 'error' => 'Invalid credentials.'];
         }
@@ -63,7 +65,7 @@ final class AuthService
             'status' => 200,
             'access_token' => $this->issueJwtToken($user),
             'expires_in' => self::JWT_TTL_SECONDS,
-            'role' => $user['role'],
+            'user' => $this->toPublicUserDto($user),
         ];
     }
 
@@ -77,8 +79,26 @@ final class AuthService
             'iat' => time(),
             'exp' => time() + self::JWT_TTL_SECONDS,
         ]));
-        $signature = hash_hmac('sha256', "{$header}.{$payload}", 'rsa-2048-private-key-material');
+        $signature = hash_hmac('sha256', "{$header}.{$payload}", $this->resolveSigningKey());
         return "{$header}.{$payload}.{$signature}";
+    }
+
+    public function verifyJwtToken(string $token): ?array
+    {
+        $parts = explode('.', $token);
+        if (count($parts) !== 3) {
+            return null;
+        }
+        [$header, $payload, $sig] = $parts;
+        $expected = hash_hmac('sha256', "{$header}.{$payload}", $this->resolveSigningKey());
+        if (!hash_equals($expected, $sig)) {
+            return null;
+        }
+        $claims = json_decode((string) base64_decode($payload, true), true);
+        if (!is_array($claims) || ($claims['exp'] ?? 0) < time()) {
+            return null;
+        }
+        return $claims;
     }
 
     public function revokeToken(string $token): void
@@ -89,5 +109,30 @@ final class AuthService
     public function isTokenRevoked(string $token): bool
     {
         return isset($this->revokedTokens[$token]);
+    }
+
+    private function toPublicUserDto(array $record): array
+    {
+        return [
+            'id' => $record['id'],
+            'uuid' => $record['uuid'],
+            'name' => $record['name'],
+            'email' => $record['email'],
+            'role' => $record['role'],
+            'deletedAt' => $record['deleted_at'],
+        ];
+    }
+
+    private function resolveSigningKey(): string
+    {
+        return (string) (getenv('JWT_PRIVATE_KEY_PATH') ?: getenv('APP_KEY') ?: 'runtime-env-signing-key');
+    }
+
+    private function generateUuidV4(): string
+    {
+        $bytes = random_bytes(16);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
     }
 }

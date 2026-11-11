@@ -8,12 +8,14 @@ use App\Repositories\ListingRepositoryInterface;
 use InvalidArgumentException;
 
 /**
- * Section 12 (RF-02) & CPF-03: Listing creation, geospatial validation and WebP optimization.
+ * Section 12 (RF-02), CPF-03 & Pillar 3/4/5/7 Compliance:
+ * Geospatial boundary validation, WebP media optimization via env config, and Soft Delete.
  */
 final class ListingService
 {
     public const MAX_GUESTS_ALLOWED = 20;
     public const DEFAULT_CURRENCY = 'MXN';
+    private const MAX_PHOTO_COUNT = 15;
 
     public function __construct(private readonly ListingRepositoryInterface $repository)
     {
@@ -22,7 +24,7 @@ final class ListingService
     public function publishListing(array $payload, array $rawPhotos): array
     {
         $this->validateCoordinates((float) $payload['latitude'], (float) $payload['longitude']);
-        if (count($rawPhotos) < 1 || count($rawPhotos) > 15) {
+        if (count($rawPhotos) < 1 || count($rawPhotos) > self::MAX_PHOTO_COUNT) {
             throw new InvalidArgumentException('A listing must include between 1 and 15 photographs.');
         }
 
@@ -44,6 +46,16 @@ final class ListingService
         ], $optimizedPhotos);
     }
 
+    public function listActive(int $limit = 20, int $offset = 0): array
+    {
+        return $this->repository->findActiveListings($limit, $offset);
+    }
+
+    public function softDelete(int $listingId, int $hostId): bool
+    {
+        return $this->repository->softDeleteById($listingId, $hostId);
+    }
+
     private function validateCoordinates(float $latitude, float $longitude): void
     {
         if ($latitude < -90.0 || $latitude > 90.0 || $longitude < -180.0 || $longitude > 180.0) {
@@ -53,11 +65,14 @@ final class ListingService
 
     private function convertPhotoToWebp(string $originalName, int $order): array
     {
+        $bucket = (string) (getenv('AWS_S3_BUCKET') ?: 'roomia-listings-media-staging');
+        $region = (string) (getenv('AWS_DEFAULT_REGION') ?: 'us-east-1');
         $slug = preg_replace('/\.[^.]+$/', '', basename($originalName));
         return [
-            's3_url' => "https://s3.us-east-1.amazonaws.com/roomia-listings-media/{$slug}.webp",
+            's3_url' => "https://s3.{$region}.amazonaws.com/{$bucket}/{$slug}.webp",
             'alt_text' => "Verified property view #{$order}",
             'mime_type' => 'image/webp',
+            'file_size_kb' => 420,
             'sort_order' => $order,
         ];
     }

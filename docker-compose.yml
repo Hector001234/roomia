@@ -1,19 +1,106 @@
 version: '3.9'
 
 services:
-  backend:
+  api-gateway:
+    image: nginx:1.25-alpine
+    container_name: roomia-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    depends_on:
+      - identity-service
+      - catalog-service
+      - search-service
+      - booking-payment-service
+      - review-service
+      - audit-service
+    networks:
+      - roomia-network
+
+  identity-service:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: roomia-backend
-    restart: unless-stopped
+    container_name: roomia-identity-service
+    environment:
+      SERVICE_NAME: identity-service
     env_file:
       - .env.example
-    volumes:
-      - ./backend:/var/www/html
     depends_on:
-      - mysql
+      - postgres
       - redis
+    networks:
+      - roomia-network
+
+  catalog-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: roomia-catalog-service
+    environment:
+      SERVICE_NAME: catalog-service
+    env_file:
+      - .env.example
+    depends_on:
+      - postgres
+    networks:
+      - roomia-network
+
+  search-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: roomia-search-service
+    environment:
+      SERVICE_NAME: search-service
+    env_file:
+      - .env.example
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - roomia-network
+
+  booking-payment-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: roomia-booking-payment-service
+    environment:
+      SERVICE_NAME: booking-payment-service
+    env_file:
+      - .env.example
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - roomia-network
+
+  review-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: roomia-review-service
+    environment:
+      SERVICE_NAME: review-service
+    env_file:
+      - .env.example
+    depends_on:
+      - postgres
+    networks:
+      - roomia-network
+
+  audit-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: roomia-audit-service
+    environment:
+      SERVICE_NAME: audit-service
+    env_file:
+      - .env.example
+    depends_on:
+      - postgres
     networks:
       - roomia-network
 
@@ -29,20 +116,19 @@ services:
     networks:
       - roomia-network
 
-  mysql:
-    image: mysql:8.0
-    container_name: roomia-mysql
+  postgres:
+    image: postgres:16-alpine
+    container_name: roomia-postgres
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: roomia_db
-      MYSQL_USER: roomia_app_user
-      MYSQL_PASSWORD: local_dev_password_only
-      MYSQL_ROOT_PASSWORD: local_root_password_only
+      POSTGRES_DB: roomia_db
+      POSTGRES_USER: roomia_app_user
+      POSTGRES_PASSWORD: local_dev_password_only
     ports:
-      - "3306:3306"
-    command: --default-authentication-plugin=mysql_native_password --transaction-isolation=READ-COMMITTED
+      - "5432:5432"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
+      - ./backend/database/postgresql:/docker-entrypoint-initdb.d:ro
     networks:
       - roomia-network
 
@@ -55,19 +141,8 @@ services:
     networks:
       - roomia-network
 
-  nginx:
-    image: nginx:1.25-alpine
-    container_name: roomia-nginx
-    restart: unless-stopped
-    ports:
-      - "8000:80"
-    depends_on:
-      - backend
-    networks:
-      - roomia-network
-
 volumes:
-  mysql-data:
+  postgres-data:
 
 networks:
   roomia-network:

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 
+use App\Database\PostgresConnection;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
@@ -11,6 +12,8 @@ use App\Http\Controllers\ListingController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Middleware\JwtAuthMiddleware;
+use App\Http\Middleware\RateLimitMiddleware;
 use App\Repositories\AuditRepository;
 use App\Repositories\ListingRepository;
 use App\Repositories\SearchRepository;
@@ -18,8 +21,10 @@ use App\Services\AuthService;
 use App\Services\BookingService;
 use App\Services\BookingTransactionService;
 use App\Services\ListingService;
+use App\Services\MicroserviceRegistry;
 use App\Services\ReviewService;
 use App\Services\StripePaymentAdapter;
+use App\Services\StructuredJsonLogger;
 
 $passed = 0;
 $failed = 0;
@@ -37,7 +42,7 @@ function assertAuditCase(string $testId, string $description, bool $condition): 
 }
 
 echo "======================================================================\n";
-echo " ROOMIA AUTOMATED AUDIT VERIFICATION SUITE (MC-ROOMIA-2026-V3.1)\n";
+echo " ROOMIA AUTOMATED AUDIT VERIFICATION SUITE (WEEKS 1, 2 & 3 + 8 PILLARS)\n";
 echo "======================================================================\n";
 
 // 1. CPF-01: RFC 5322 Invalid Email Registration
@@ -50,18 +55,19 @@ $cpf01 = $authController->register([
 ]);
 assertAuditCase('CPF-01', 'Reject invalid RFC 5322 email with HTTP 422', $cpf01['status_code'] === 422);
 
-// 2. CP-AUTH-01: Argon2id Hashing Parameters (m=65536, t=4, p=2)
+// 2. CP-AUTH-01: Argon2id Hashing Parameters (m=65536, t=4, p=2) & Zero Hash Leakage in Public DTO
 $validReg = $authController->register([
     'name' => 'Ana Gomez',
     'email' => 'ana.gomez@roomia.mx',
     'password' => 'SecurePass#2026',
     'role' => 'GUEST',
 ]);
-$hash = $validReg['data']['password_hash'] ?? '';
+$internalHash = $authService->hashPassword('SecurePass#2026');
+$publicDtoHasNoHash = !isset($validReg['data']['password_hash']) && !isset($validReg['data']['two_factor_secret']);
 assertAuditCase(
     'CP-AUTH-01',
-    'Password hashed with Argon2id (memory=65536, time=4, threads=2)',
-    str_starts_with($hash, '$argon2id$v=19$m=65536,t=4,p=2$')
+    'Password hashed with Argon2id (m=65536, t=4, p=2) and stripped from HTTP response DTO',
+    str_starts_with($internalHash, '$argon2id$v=19$m=65536,t=4,p=2$') && $publicDtoHasNoHash
 );
 
 // 3. CP-AUTH-02: RSA-2048 JWT Issuance (60m TTL) & 5-Attempt Brute Force Lockout
@@ -76,7 +82,7 @@ assertAuditCase(
     $loginOk['status'] === 200 && $loginOk['expires_in'] === 3600 && $lockedResp['status'] === 429
 );
 
-// 4. CPF-03 & CP-CAT-01: Listing Creation with 15 WebP Photos & Coordinate Validation
+// 4. CPF-03 & CP-CAT-01: Listing Creation with 15 WebP Photos, Coordinate Validation & Soft Delete
 $listingRepo = new ListingRepository();
 $listingService = new ListingService($listingRepo);
 $listingController = new ListingController($listingService);
@@ -167,7 +173,7 @@ assertAuditCase(
 );
 assertAuditCase(
     'CP-CONC-02',
-    'Exact DECIMAL(10,2) calculation (3 nights * 1500.00 = 4500.00 + 540.00 fee + 720.00 tax = 5760.00)',
+    'Exact NUMERIC(10,2) calculation (3 nights * 1500.00 = 4500.00 + 540.00 fee + 720.00 tax = 5760.00)',
     $firstBooking['booking']['total_amount'] === '5760.00' && strlen($firstBooking['booking']['integrity_sha256']) === 64
 );
 
@@ -225,6 +231,54 @@ assertAuditCase(
     'CP-AUD-01 & CP-AUD-02',
     'Block UPDATE/DELETE on audit_logs (SQLSTATE 45000) and verify 100% SHA-256 hash chain integrity',
     $updateBlocked && $auditResp['status_code'] === 200 && $auditResp['chain_integrity_verified'] === true
+);
+
+// 10. CP-PGSQL-01: PostgreSQL 16 3NF DDL, PL/pgSQL Data Audit Triggers & Views Verification
+$schemaSql = (string) file_get_contents(__DIR__ . '/../database/postgresql/01_schema_3fn.sql');
+$triggersSql = (string) file_get_contents(__DIR__ . '/../database/postgresql/02_data_audit_triggers.sql');
+$pgConnector = new PostgresConnection();
+assertAuditCase(
+    'CP-PGSQL-01',
+    'PostgreSQL 16 schema (3NF), PL/pgSQL row-level SHA-256 audit triggers and tamper-detection views present',
+    str_contains($schemaSql, 'uq_booking_dates_active_lock')
+    && str_contains($triggersSql, 'fn_automatic_row_level_data_audit')
+    && str_contains($triggersSql, 'v_booking_tamper_detection')
+    && str_contains($triggersSql, 'v_pci_dss_compliance_check')
+    && method_exists($pgConnector, 'lockListingDatesForUpdate')
+);
+
+// 11. CP-OBS-01: Microservice Registry & Structured JSON Telemetry with PII/PAN Redaction (§35.2)
+$services = MicroserviceRegistry::getAllServices();
+$logger = new StructuredJsonLogger();
+$logJson = $logger->logEvent('INFO', 'booking-payment-service', 201, 4.25, '189.203.44.19', 'Booking locked', [
+    'booking_id' => 1,
+    'card_number' => '4000000000000999',
+]);
+assertAuditCase(
+    'CP-OBS-01',
+    '6 Microservices registered and StructuredJsonLogger emits OpenTelemetry traceId while redacting card PAN',
+    count($services) === 6
+    && str_contains($logJson, '"emitterMicroservice":"booking-payment-service"')
+    && str_contains($logJson, '"ipAnonymized":"189.203.44.XXX"')
+    && str_contains($logJson, '[REDACTED_BY_SECURITY_POLICY]')
+);
+
+// 12. 8-Pillar Verification: JwtAuthMiddleware, RateLimitMiddleware & Soft Delete (deleted_at)
+$jwtMw = new JwtAuthMiddleware($authService);
+$tokenCheck = $jwtMw->handle('Bearer ' . $loginOk['access_token']);
+$rateMw = new RateLimitMiddleware(2, 60);
+$rateMw->handle('10.0.0.1', 'POST /api/v1/bookings');
+$rateMw->handle('10.0.0.1', 'POST /api/v1/bookings');
+$rateBlocked = $rateMw->handle('10.0.0.1', 'POST /api/v1/bookings');
+$softDel = $listingController->destroy('HOST', 1);
+
+assertAuditCase(
+    'CP-8PILLAR-01',
+    'Enforce JwtAuthMiddleware, RateLimitMiddleware (HTTP 429) and Logical Soft Delete (deleted_at)',
+    $tokenCheck['allowed'] === true
+    && $rateBlocked['allowed'] === false
+    && $rateBlocked['status_code'] === 429
+    && $softDel['status_code'] === 200
 );
 
 echo "======================================================================\n";

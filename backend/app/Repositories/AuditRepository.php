@@ -7,10 +7,12 @@ namespace App\Repositories;
 use RuntimeException;
 
 /**
- * Section 12 (RF-06) & RQ-AUD-01: Append-only immutable audit log with SHA-256 hash chain.
+ * Section 12 (RF-06), RQ-AUD-01 & Pillar 3 (Bounded Pagination) Compliance:
+ * Append-only immutable audit log with SHA-256 hash chain and bounded retrieval.
  */
 final class AuditRepository
 {
+    private const MAX_PAGE_SIZE = 100;
     private array $entries = [];
 
     public function appendLog(
@@ -76,9 +78,11 @@ final class AuditRepository
         return true;
     }
 
-    public function getAllEntries(): array
+    public function getAllEntries(int $limit = 50, int $offset = 0): array
     {
-        return $this->entries;
+        $safeLimit = max(1, min($limit, self::MAX_PAGE_SIZE));
+        $safeOffset = max(0, $offset);
+        return array_slice($this->entries, $safeOffset, $safeLimit);
     }
 
     private function getLastHash(): string

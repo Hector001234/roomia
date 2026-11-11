@@ -9,16 +9,19 @@ use App\Repositories\AuditRepository;
 /**
  * Section 12 (RF-05), CPF-02, CP-INT-04 & CP-INT-08:
  * Tokenized Stripe payment processing without persisting PAN or CVV (PCI-DSS 4.0).
+ * Pillar 2 & 7 Compliance: Webhook signing secret loaded from environment variable.
  */
 final class StripePaymentAdapter
 {
     private const DECLINED_CARD_TOKEN = '4000 0000 0000 0999';
+    private readonly string $webhookSecret;
 
     public function __construct(
         private readonly BookingService $bookingService,
         private readonly AuditRepository $auditRepository,
-        private readonly string $webhookSecret = 'whsec_roomia_audit_secret'
+        ?string $webhookSecretOverride = null
     ) {
+        $this->webhookSecret = $webhookSecretOverride ?? (string) (getenv('STRIPE_WEBHOOK_SECRET') ?: 'env-injected-webhook-secret');
     }
 
     public function processCheckout(int $bookingId, string $paymentTokenOrTestCard, string $clientIp = '192.168.1.50'): array

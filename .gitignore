@@ -10,6 +10,8 @@
 /backend/vendor/
 /frontend/node_modules/
 /frontend/dist/
+/frontend-admin/node_modules/
+/frontend-admin/dist/
 /backend/storage/*.key
 .phpunit.result.cache
 coverage/
