@@ -6,9 +6,64 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const STATE_FILE = path.join(__dirname, 'database', 'roomia_live_state.json');
+const SHARED_CATALOG_FILE = path.join(__dirname, 'database', 'roomia_shared_catalog.json');
 
-const JWT_SECRET = process.env.ROOMIA_JWT_SECRET || 'roomia-ephemeral-signing-key-v3.1';
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_roomia_audit_secret';
+const EPHEMERAL_JWT_KEY = crypto.randomBytes(32).toString('hex');
+const EPHEMERAL_STRIPE_KEY = crypto.randomBytes(32).toString('hex');
+
+function getJwtSecret() {
+  return process.env.ROOMIA_JWT_SECRET || EPHEMERAL_JWT_KEY;
+}
+
+function getStripeWebhookSecret() {
+  return process.env.STRIPE_WEBHOOK_SECRET || EPHEMERAL_STRIPE_KEY;
+}
+
+function hashPassword(password) {
+  const saltB64 = crypto.randomBytes(16).toString('base64url');
+  const derived = crypto.scryptSync(password, saltB64, 32).toString('base64url');
+  return `$argon2id$v=19$m=65536,t=4,p=2$${saltB64}$${derived}`;
+}
+
+function verifyPassword(password, storedHash) {
+  const parts = String(storedHash || '').split('$');
+  if (parts.length !== 6) return false;
+  const saltB64 = parts[4];
+  const expectedB64 = parts[5];
+  if (!saltB64 || !expectedB64) return false;
+  const derivedBuf = crypto.scryptSync(password, saltB64, 32);
+  const expectedBuf = Buffer.from(expectedB64, 'base64url');
+  if (derivedBuf.length !== expectedBuf.length) return false;
+  return crypto.timingSafeEqual(derivedBuf, expectedBuf);
+}
+
+function verifyJwtToken(authHeader) {
+  if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = authHeader.slice(7).trim();
+  const segments = token.split('.');
+  if (segments.length !== 3) return null;
+  const [headerB64, payloadB64, sigB64] = segments;
+  const expectedSig = crypto
+    .createHmac('sha256', getJwtSecret())
+    .update(`${headerB64}.${payloadB64}`)
+    .digest();
+  const actualSig = Buffer.from(sigB64, 'base64url');
+  if (expectedSig.length !== actualSig.length || !crypto.timingSafeEqual(expectedSig, actualSig)) {
+    return null;
+  }
+  try {
+    const claims = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
+    const now = Math.floor(Date.now() / 1000);
+    if (!claims || typeof claims.exp !== 'number' || claims.exp <= now) {
+      return null;
+    }
+    return claims;
+  } catch {
+    return null;
+  }
+}
 
 function computeAuditHash(prevHash, eventType, entityType, entityId, ipAnonymized, createdAtUtc) {
   return crypto
@@ -30,6 +85,7 @@ function createInitialState() {
   const h1 = computeAuditHash(genesisPrev, 'SYSTEM_GENESIS_INIT', 'system', 'roomia-v3.1', '189.203.44.XXX', t1);
   const t2 = '2026-11-05T18:01:10.450Z';
   const h2 = computeAuditHash(h1, 'LISTING_PUBLISHED_WEBP', 'listings', '42', '189.203.44.XXX', t2);
+  const seedPasswordHash = hashPassword('RoomiaAudit2026!');
 
   return {
     users: [
@@ -38,7 +94,7 @@ function createInitialState() {
         uuid: '10000000-0000-4000-8000-000000000001',
         name: 'Elena Rostova (Anfitriona Verificada)',
         email: 'host.elena@roomia.mx',
-        passwordHash: '$argon2id$v=19$m=65536,t=4,p=2$c2FsdHluZXRURVNUXzE$8f2d7c9e1a3b5d7f9a0b1c2d3e4f5a6b7c8d9e0f1a2',
+        passwordHash: seedPasswordHash,
         role: 'HOST',
         failedLoginAttempts: 0,
         lockedUntil: null,
@@ -50,7 +106,7 @@ function createInitialState() {
         uuid: '10000000-0000-4000-8000-000000000104',
         name: 'Alejandro Mendoza (Huésped)',
         email: 'guest.alejandro@roomia.mx',
-        passwordHash: '$argon2id$v=19$m=65536,t=4,p=2$c2FsdHluZXRURVNUXzI$9a3b5d7f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6',
+        passwordHash: seedPasswordHash,
         role: 'GUEST',
         failedLoginAttempts: 0,
         lockedUntil: null,
@@ -62,7 +118,7 @@ function createInitialState() {
         uuid: '10000000-0000-4000-8000-000000000999',
         name: 'Auditor Senior TI (CISA)',
         email: 'auditor.ti@roomia.mx',
-        passwordHash: '$argon2id$v=19$m=65536,t=4,p=2$c2FsdHluZXRURVNUXzM$7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8',
+        passwordHash: seedPasswordHash,
         role: 'ADMIN',
         failedLoginAttempts: 0,
         lockedUntil: null,
@@ -168,17 +224,34 @@ function createInitialState() {
   };
 }
 
+let cachedState = null;
+let cachedMtimeMs = 0;
+
 function loadState() {
-  try {
-    if (fs.existsSync(STATE_FILE)) {
+  if (fs.existsSync(STATE_FILE)) {
+    try {
+      const stat = fs.statSync(STATE_FILE);
+      if (cachedState && stat.mtimeMs === cachedMtimeMs) {
+        return cachedState;
+      }
       const raw = fs.readFileSync(STATE_FILE, 'utf8');
-      return JSON.parse(raw);
+      cachedState = JSON.parse(raw);
+      cachedMtimeMs = stat.mtimeMs;
+      return cachedState;
+    } catch (err) {
+      const backupFile = `${STATE_FILE}.corrupted.${Date.now()}`;
+      try {
+        fs.copyFileSync(STATE_FILE, backupFile);
+      } catch {
+        // Ignore backup failure if permissions deny
+      }
+      process.stderr.write(`[CRITICAL][REL-01] Corrupted state file preserved at ${backupFile}: ${err.message}\n`);
+      throw new Error('Database state file is corrupted. Manual recovery required from backup.');
     }
-  } catch {
-    // Fallback to initial state if corrupted
   }
   const initial = createInitialState();
   saveState(initial);
+  cachedState = initial;
   return initial;
 }
 
@@ -187,7 +260,15 @@ function saveState(state) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
+  const tmpFile = `${STATE_FILE}.tmp.${process.pid}`;
+  fs.writeFileSync(tmpFile, JSON.stringify(state, null, 2), 'utf8');
+  fs.renameSync(tmpFile, STATE_FILE);
+  cachedState = state;
+  try {
+    cachedMtimeMs = fs.statSync(STATE_FILE).mtimeMs;
+  } catch {
+    cachedMtimeMs = Date.now();
+  }
 }
 
 function appendAudit(state, userId, eventType, entityType, entityId, ipRaw = '189.203.44.19') {
@@ -260,7 +341,7 @@ function issueJwtToken(user) {
       exp: now + 3600,
     })
   ).toString('base64url');
-  const signature = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${payload}`).digest('base64url');
+  const signature = crypto.createHmac('sha256', getJwtSecret()).update(`${header}.${payload}`).digest('base64url');
   return `${header}.${payload}.${signature}`;
 }
 
@@ -311,11 +392,52 @@ export function handleApiRequest(method, urlStr, bodyObj = {}, headers = {}) {
 
   const state = loadState();
 
+  // 0. Cross-Origin Real-Time Catalog & Entities Sync between Admin (:5175) and Public Portal (:5174)
+  if (pathname === '/api/v1/state-sync') {
+    if (method === 'GET') {
+      let shared = null;
+      if (fs.existsSync(SHARED_CATALOG_FILE)) {
+        try {
+          shared = JSON.parse(fs.readFileSync(SHARED_CATALOG_FILE, 'utf8'));
+        } catch {
+          shared = null;
+        }
+      }
+      return {
+        statusCode: 200,
+        payload: {
+          status_code: 200,
+          state: shared,
+          liveState: {
+            users: state.users.map(toPublicUserDto),
+            listings: state.listings,
+            bookings: state.bookings,
+            lockedDates: state.lockedDates,
+            reviews: state.reviews,
+            completedStays: state.completedStays,
+            auditLogs: state.auditLogs,
+          },
+        },
+      };
+    }
+    if (method === 'POST' && bodyObj && Array.isArray(bodyObj.listings)) {
+      const dir = path.dirname(SHARED_CATALOG_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const tmp = `${SHARED_CATALOG_FILE}.tmp.${process.pid}`;
+      fs.writeFileSync(tmp, JSON.stringify(bodyObj, null, 2), 'utf8');
+      fs.renameSync(tmp, SHARED_CATALOG_FILE);
+      return { statusCode: 200, payload: { status_code: 200, synced: true } };
+    }
+  }
+
   // 1. GET /api/v1/listings (Bounded pagination + soft delete filter)
   if (method === 'GET' && pathname === '/api/v1/listings') {
     const limit = Math.max(1, Math.min(50, Number(query.limit || 20)));
     const offset = Math.max(0, Number(query.offset || 0));
-    const activeListings = state.listings.filter((l) => l.deletedAt === null && l.status === 'ACTIVE');
+    const includeAll = query.include_all === '1';
+    const activeListings = includeAll
+      ? state.listings
+      : state.listings.filter((l) => l.deletedAt === null && l.status === 'ACTIVE');
     const slice = activeListings.slice(offset, offset + limit);
 
     return {
@@ -323,13 +445,33 @@ export function handleApiRequest(method, urlStr, bodyObj = {}, headers = {}) {
       payload: {
         status_code: 200,
         data: slice,
-        bookings: state.bookings.filter((b) => b.deletedAt === null),
         reviews: state.reviews.filter((r) => r.deletedAt === null),
         pagination: {
           total: activeListings.length,
           limit,
           offset,
         },
+      },
+    };
+  }
+
+  // 1b. GET /api/v1/bookings/me (Authenticated private bookings endpoint - FUG-01)
+  if (method === 'GET' && pathname === '/api/v1/bookings/me') {
+    const claims = verifyJwtToken(headers.authorization || headers.Authorization);
+    if (!claims) {
+      return {
+        statusCode: 401,
+        payload: { status_code: 401, error: 'Unauthorized: Valid Bearer JWT required.' },
+      };
+    }
+    const userBookings = state.bookings.filter(
+      (b) => b.deletedAt === null && (claims.role === 'ADMIN' || b.guestId === claims.sub)
+    );
+    return {
+      statusCode: 200,
+      payload: {
+        status_code: 200,
+        data: userBookings,
       },
     };
   }
@@ -420,9 +562,7 @@ export function handleApiRequest(method, urlStr, bodyObj = {}, headers = {}) {
       };
     }
 
-    const saltB64 = crypto.randomBytes(16).toString('base64url');
-    const derived = crypto.scryptSync(password, saltB64, 32).toString('base64url');
-    const argon2idHash = `$argon2id$v=19$m=65536,t=4,p=2$${saltB64}$${derived}`;
+    const argon2idHash = hashPassword(password);
 
     const newUser = {
       id: state.users.length > 0 ? Math.max(...state.users.map((u) => u.id)) + 1 : 1,
@@ -475,7 +615,7 @@ export function handleApiRequest(method, urlStr, bodyObj = {}, headers = {}) {
       };
     }
 
-    if (password === 'WrongPassword' || password.length < 4) {
+    if (!verifyPassword(password, user.passwordHash)) {
       user.failedLoginAttempts += 1;
       saveState(state);
       return {
@@ -562,11 +702,16 @@ export function handleApiRequest(method, urlStr, bodyObj = {}, headers = {}) {
       hostId: Number(bodyObj.hostId || 1),
       title,
       description: String(bodyObj.description || `Alojamiento verificado en ${city} con estándares ISO/IEC 25010.`),
+      category: String(bodyObj.category || 'Lofts'),
       city,
+      stateName: String(bodyObj.stateName || 'Estado de México'),
       latitude: latitude.toFixed(7),
       longitude: longitude.toFixed(7),
       pricePerNight: pricePerNight.toFixed(2),
       maxGuests: Math.max(1, Math.min(16, maxGuests)),
+      bedrooms: Number(bodyObj.bedrooms ?? 2),
+      bathrooms: Number(bodyObj.bathrooms ?? 1),
+      amenities: Array.isArray(bodyObj.amenities) ? bodyObj.amenities : ['Wi-Fi Fibra Óptica', 'Cerradura inteligente'],
       status: 'ACTIVE',
       photoUrl:
         bodyObj.photoUrl ||
@@ -593,13 +738,18 @@ export function handleApiRequest(method, urlStr, bodyObj = {}, headers = {}) {
   const deleteMatch = pathname.match(/^\/api\/v1\/listings\/(\d+)$/);
   if (method === 'DELETE' && deleteMatch) {
     const listingId = Number(deleteMatch[1]);
-    const listing = state.listings.find((l) => l.id === listingId && l.deletedAt === null);
+    const titleHint = String(bodyObj.title || '').trim().toLowerCase();
+    const listing = state.listings.find(
+      (l) =>
+        (l.id === listingId && l.deletedAt === null) ||
+        (titleHint && l.title.trim().toLowerCase() === titleHint && l.deletedAt === null)
+    );
     if (!listing) {
       return { statusCode: 404, payload: { status_code: 404, error: 'Alojamiento no encontrado o ya dado de baja.' } };
     }
     listing.deletedAt = new Date().toISOString();
     listing.status = 'PAUSED';
-    appendAudit(state, 1, 'LISTING_SOFT_DELETED', 'listings', listingId, clientIp);
+    appendAudit(state, 1, 'LISTING_SOFT_DELETED', 'listings', listing.id, clientIp);
     saveState(state);
 
     return {
@@ -609,6 +759,64 @@ export function handleApiRequest(method, urlStr, bodyObj = {}, headers = {}) {
         data: listing,
         message: `Borrado lógico aplicado correctamente (deleted_at = ${listing.deletedAt}).`,
       },
+    };
+  }
+
+  // 6b. PATCH /api/v1/listings/:id/restore (Reactivate soft-deleted listing)
+  const restoreMatch = pathname.match(/^\/api\/v1\/listings\/(\d+)\/restore$/);
+  if (method === 'PATCH' && restoreMatch) {
+    const listingId = Number(restoreMatch[1]);
+    const titleHint = String(bodyObj.title || '').trim().toLowerCase();
+    const listing = state.listings.find(
+      (l) => l.id === listingId || (titleHint && l.title.trim().toLowerCase() === titleHint)
+    );
+    if (!listing) {
+      return { statusCode: 404, payload: { status_code: 404, error: 'Alojamiento no encontrado.' } };
+    }
+    listing.deletedAt = null;
+    listing.status = 'ACTIVE';
+    appendAudit(state, 1, 'LISTING_RESTORED_ACTIVE', 'listings', listing.id, clientIp);
+    saveState(state);
+
+    return {
+      statusCode: 200,
+      payload: {
+        status_code: 200,
+        data: listing,
+        message: 'Alojamiento reactivado correctamente.',
+      },
+    };
+  }
+
+  // 6c. PATCH /api/v1/listings/:id (Update listing details and status)
+  const updateMatch = pathname.match(/^\/api\/v1\/listings\/(\d+)$/);
+  if (method === 'PATCH' && updateMatch) {
+    const listingId = Number(updateMatch[1]);
+    const prevTitle = String(bodyObj.previousTitle || bodyObj.title || '').trim().toLowerCase();
+    const listing = state.listings.find(
+      (l) => l.id === listingId || (prevTitle && l.title.trim().toLowerCase() === prevTitle)
+    );
+    if (!listing) {
+      return { statusCode: 404, payload: { status_code: 404, error: 'Alojamiento no encontrado.' } };
+    }
+    if (bodyObj.title) listing.title = String(bodyObj.title).trim();
+    if (bodyObj.description) listing.description = String(bodyObj.description).trim();
+    if (bodyObj.city) listing.city = String(bodyObj.city).trim();
+    if (bodyObj.category) listing.category = String(bodyObj.category).trim();
+    if (bodyObj.pricePerNight !== undefined) listing.pricePerNight = Number(bodyObj.pricePerNight).toFixed(2);
+    if (bodyObj.maxGuests !== undefined) listing.maxGuests = Number(bodyObj.maxGuests);
+    if (bodyObj.bedrooms !== undefined) listing.bedrooms = Number(bodyObj.bedrooms);
+    if (bodyObj.bathrooms !== undefined) listing.bathrooms = Number(bodyObj.bathrooms);
+    if (bodyObj.photoUrl) listing.photoUrl = String(bodyObj.photoUrl).trim();
+    if (bodyObj.status) {
+      listing.status = String(bodyObj.status);
+      listing.deletedAt = listing.status === 'ACTIVE' ? null : listing.deletedAt || new Date().toISOString();
+    }
+    appendAudit(state, 1, 'LISTING_UPDATED_CHANGES', 'listings', listing.id, clientIp);
+    saveState(state);
+    return {
+      statusCode: 200,
+      payload: { status_code: 200, data: listing },
     };
   }
 
@@ -886,8 +1094,22 @@ export function handleApiRequest(method, urlStr, bodyObj = {}, headers = {}) {
     };
   }
 
-  // 11. GET /api/v1/audit (Bounded pagination + SHA-256 chain verification)
+  // 11. GET /api/v1/audit (Requires JWT + ADMIN RBAC + SHA-256 chain verification - SEC-01)
   if (method === 'GET' && pathname === '/api/v1/audit') {
+    const claims = verifyJwtToken(headers.authorization || headers.Authorization);
+    if (!claims) {
+      return {
+        statusCode: 401,
+        payload: { status_code: 401, error: 'Unauthorized: Bearer JWT token required.' },
+      };
+    }
+    if (String(claims.role || '').toUpperCase() !== 'ADMIN') {
+      return {
+        statusCode: 403,
+        payload: { status_code: 403, error: 'Forbidden: ADMIN role required to access audit logs.' },
+      };
+    }
+
     const limit = Math.max(1, Math.min(100, Number(query.limit || 50)));
     const offset = Math.max(0, Number(query.offset || 0));
     const chainVerified = verifyAuditChain(state.auditLogs);
@@ -914,7 +1136,7 @@ export function handleApiRequest(method, urlStr, bodyObj = {}, headers = {}) {
   if (method === 'POST' && pathname === '/api/v1/webhooks/stripe') {
     const signature = String(headers['stripe-signature'] || bodyObj.signature || '');
     const rawPayload = typeof bodyObj.rawPayload === 'string' ? bodyObj.rawPayload : JSON.stringify(bodyObj);
-    const expectedSig = crypto.createHmac('sha256', STRIPE_WEBHOOK_SECRET).update(rawPayload).digest('hex');
+    const expectedSig = crypto.createHmac('sha256', getStripeWebhookSecret()).update(rawPayload).digest('hex');
 
     if (signature !== expectedSig) {
       appendAudit(state, null, 'FORGED_STRIPE_WEBHOOK_BLOCKED_400', 'payments', 'forged', clientIp);

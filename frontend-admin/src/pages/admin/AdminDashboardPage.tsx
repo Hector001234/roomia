@@ -208,7 +208,7 @@ export const AdminDashboardPage: React.FC = () => {
 
           <div className="space-y-3 text-xs">
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-              <div className="font-bold text-slate-900">🔒 Control de Concurrencia (CP-CONC-01)</div>
+              <div className="font-bold text-slate-900">Control de Concurrencia (CP-CONC-01)</div>
               <p className="text-slate-600 text-[11px]">
                 Bloqueo pesimista con <code className="bg-white px-1 rounded border">SELECT ... FOR UPDATE</code> y
                 restricción única parcial en <code className="bg-white px-1 rounded border">booking_dates</code>.
@@ -216,14 +216,14 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
 
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-              <div className="font-bold text-slate-900">💳 PCI-DSS 4.0 Tokenizado (CPF-02)</div>
+              <div className="font-bold text-slate-900">PCI-DSS 4.0 Tokenizado (CPF-02)</div>
               <p className="text-slate-600 text-[11px]">
                 Pasarela Stripe con webhooks firmados HMAC-SHA256. Cero almacenamiento de números de tarjeta o CVV en base de datos.
               </p>
             </div>
 
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-              <div className="font-bold text-slate-900">🛡️ Inmutabilidad D5 audit_logs (RQ-AUD-01)</div>
+              <div className="font-bold text-slate-900">Inmutabilidad D5 audit_logs (RQ-AUD-01)</div>
               <p className="text-slate-600 text-[11px]">
                 Trigger PL/pgSQL que eleva <code className="bg-white px-1 rounded border">SQLSTATE 45000</code> ante cualquier intento de UPDATE o DELETE.
               </p>

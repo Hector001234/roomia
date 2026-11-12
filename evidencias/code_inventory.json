@@ -1,0 +1,682 @@
+[
+  {
+    "path": "backend/apiEngine.mjs",
+    "lines": 941,
+    "bytes": 32269
+  },
+  {
+    "path": "backend/app/Database/PostgresConnection.php",
+    "lines": 105,
+    "bytes": 3336
+  },
+  {
+    "path": "backend/app/Http/Controllers/AuditController.php",
+    "lines": 29,
+    "bytes": 779
+  },
+  {
+    "path": "backend/app/Http/Controllers/AuthController.php",
+    "lines": 38,
+    "bytes": 1002
+  },
+  {
+    "path": "backend/app/Http/Controllers/BookingController.php",
+    "lines": 31,
+    "bytes": 869
+  },
+  {
+    "path": "backend/app/Http/Controllers/ListingController.php",
+    "lines": 53,
+    "bytes": 1752
+  },
+  {
+    "path": "backend/app/Http/Controllers/ReviewController.php",
+    "lines": 20,
+    "bytes": 487
+  },
+  {
+    "path": "backend/app/Http/Controllers/SearchController.php",
+    "lines": 25,
+    "bytes": 561
+  },
+  {
+    "path": "backend/app/Http/Controllers/WebhookController.php",
+    "lines": 20,
+    "bytes": 498
+  },
+  {
+    "path": "backend/app/Http/Middleware/AuditLoggerMiddleware.php",
+    "lines": 36,
+    "bytes": 841
+  },
+  {
+    "path": "backend/app/Http/Middleware/JwtAuthMiddleware.php",
+    "lines": 38,
+    "bytes": 1226
+  },
+  {
+    "path": "backend/app/Http/Middleware/RateLimitMiddleware.php",
+    "lines": 32,
+    "bytes": 893
+  },
+  {
+    "path": "backend/app/Http/Middleware/RoleMiddleware.php",
+    "lines": 29,
+    "bytes": 858
+  },
+  {
+    "path": "backend/app/Http/Requests/RegisterRequest.php",
+    "lines": 36,
+    "bytes": 1134
+  },
+  {
+    "path": "backend/app/Http/Requests/StoreBookingRequest.php",
+    "lines": 30,
+    "bytes": 874
+  },
+  {
+    "path": "backend/app/Http/Requests/StoreListingRequest.php",
+    "lines": 39,
+    "bytes": 1219
+  },
+  {
+    "path": "backend/app/Repositories/AuditRepository.php",
+    "lines": 110,
+    "bytes": 3612
+  },
+  {
+    "path": "backend/app/Repositories/ListingRepository.php",
+    "lines": 61,
+    "bytes": 1866
+  },
+  {
+    "path": "backend/app/Repositories/ListingRepositoryInterface.php",
+    "lines": 20,
+    "bytes": 479
+  },
+  {
+    "path": "backend/app/Repositories/SearchRepository.php",
+    "lines": 69,
+    "bytes": 2181
+  },
+  {
+    "path": "backend/app/Services/AuthService.php",
+    "lines": 139,
+    "bytes": 4697
+  },
+  {
+    "path": "backend/app/Services/BookingService.php",
+    "lines": 87,
+    "bytes": 3298
+  },
+  {
+    "path": "backend/app/Services/BookingTransactionService.php",
+    "lines": 81,
+    "bytes": 2747
+  },
+  {
+    "path": "backend/app/Services/ListingService.php",
+    "lines": 80,
+    "bytes": 3088
+  },
+  {
+    "path": "backend/app/Services/MicroserviceRegistry.php",
+    "lines": 68,
+    "bytes": 2266
+  },
+  {
+    "path": "backend/app/Services/ReviewService.php",
+    "lines": 61,
+    "bytes": 1981
+  },
+  {
+    "path": "backend/app/Services/StripePaymentAdapter.php",
+    "lines": 88,
+    "bytes": 3707
+  },
+  {
+    "path": "backend/app/Services/StructuredJsonLogger.php",
+    "lines": 69,
+    "bytes": 2138
+  },
+  {
+    "path": "backend/composer.json",
+    "lines": 25,
+    "bytes": 578
+  },
+  {
+    "path": "backend/config/constants.php",
+    "lines": 17,
+    "bytes": 380
+  },
+  {
+    "path": "backend/config/hashing.php",
+    "lines": 17,
+    "bytes": 443
+  },
+  {
+    "path": "backend/database/migrations/2026_09_01_000001_create_users_table.php",
+    "lines": 32,
+    "bytes": 1007
+  },
+  {
+    "path": "backend/database/migrations/2026_09_01_000002_create_listings_and_photos_tables.php",
+    "lines": 65,
+    "bytes": 2797
+  },
+  {
+    "path": "backend/database/migrations/2026_09_01_000003_create_bookings_and_dates_tables.php",
+    "lines": 50,
+    "bytes": 2056
+  },
+  {
+    "path": "backend/database/migrations/2026_09_01_000004_create_payments_and_reviews_tables.php",
+    "lines": 47,
+    "bytes": 1914
+  },
+  {
+    "path": "backend/database/migrations/2026_09_01_000005_create_audit_logs_table.php",
+    "lines": 51,
+    "bytes": 1523
+  },
+  {
+    "path": "backend/database/postgresql/01_schema_3fn.sql",
+    "lines": 222,
+    "bytes": 10664
+  },
+  {
+    "path": "backend/database/postgresql/02_data_audit_triggers.sql",
+    "lines": 230,
+    "bytes": 8632
+  },
+  {
+    "path": "backend/database/postgresql/03_seed_synthetic_data.sql",
+    "lines": 87,
+    "bytes": 3985
+  },
+  {
+    "path": "backend/database/postgresql/04_auditor_verification_queries.sql",
+    "lines": 34,
+    "bytes": 1654
+  },
+  {
+    "path": "backend/database/roomia_live_state.json",
+    "lines": 137,
+    "bytes": 4942
+  },
+  {
+    "path": "backend/database/seeders/DatabaseSeeder.php",
+    "lines": 36,
+    "bytes": 1209
+  },
+  {
+    "path": "backend/public/index.php",
+    "lines": 76,
+    "bytes": 2528
+  },
+  {
+    "path": "backend/routes/api.php",
+    "lines": 67,
+    "bytes": 2578
+  },
+  {
+    "path": "backend/server.mjs",
+    "lines": 42,
+    "bytes": 1329
+  },
+  {
+    "path": "backend/tests/bootstrap.php",
+    "lines": 22,
+    "bytes": 689
+  },
+  {
+    "path": "backend/tests/Feature/AuthAndSecurityTest.php",
+    "lines": 26,
+    "bytes": 670
+  },
+  {
+    "path": "backend/tests/Feature/BookingAndPaymentTest.php",
+    "lines": 34,
+    "bytes": 1079
+  },
+  {
+    "path": "backend/tests/Feature/ListingAndSearchTest.php",
+    "lines": 29,
+    "bytes": 963
+  },
+  {
+    "path": "backend/tests/Feature/ReviewAndAuditTest.php",
+    "lines": 24,
+    "bytes": 701
+  },
+  {
+    "path": "backend/tests/run_audit_suite.mjs",
+    "lines": 276,
+    "bytes": 10005
+  },
+  {
+    "path": "backend/tests/run_audit_suite.php",
+    "lines": 288,
+    "bytes": 11978
+  },
+  {
+    "path": "frontend/e2e/accessibility-wcag.spec.ts",
+    "lines": 45,
+    "bytes": 1711
+  },
+  {
+    "path": "frontend/e2e/roomia-critical-flows.spec.ts",
+    "lines": 40,
+    "bytes": 1442
+  },
+  {
+    "path": "frontend/package-lock.json",
+    "lines": 3537,
+    "bytes": 120304
+  },
+  {
+    "path": "frontend/package.json",
+    "lines": 27,
+    "bytes": 624
+  },
+  {
+    "path": "frontend/src/App.tsx",
+    "lines": 7,
+    "bytes": 140
+  },
+  {
+    "path": "frontend/src/components/AdminLogs.tsx",
+    "lines": 91,
+    "bytes": 3890
+  },
+  {
+    "path": "frontend/src/components/BookingModal.tsx",
+    "lines": 198,
+    "bytes": 6724
+  },
+  {
+    "path": "frontend/src/components/Checkout.tsx",
+    "lines": 235,
+    "bytes": 9003
+  },
+  {
+    "path": "frontend/src/components/CheckoutModal.tsx",
+    "lines": 102,
+    "bytes": 3499
+  },
+  {
+    "path": "frontend/src/components/common/AdminRoute.tsx",
+    "lines": 49,
+    "bytes": 1999
+  },
+  {
+    "path": "frontend/src/components/CreateListing.tsx",
+    "lines": 189,
+    "bytes": 6485
+  },
+  {
+    "path": "frontend/src/components/GuestTripsView.tsx",
+    "lines": 278,
+    "bytes": 12848
+  },
+  {
+    "path": "frontend/src/components/HostDashboard.tsx",
+    "lines": 528,
+    "bytes": 20514
+  },
+  {
+    "path": "frontend/src/components/PropertyCard.tsx",
+    "lines": 244,
+    "bytes": 9743
+  },
+  {
+    "path": "frontend/src/components/PropertyDetailModal.tsx",
+    "lines": 820,
+    "bytes": 38038
+  },
+  {
+    "path": "frontend/src/components/public/BookingVoucherModal.tsx",
+    "lines": 154,
+    "bytes": 7059
+  },
+  {
+    "path": "frontend/src/components/public/FilterModal.tsx",
+    "lines": 268,
+    "bytes": 10157
+  },
+  {
+    "path": "frontend/src/components/public/GuestGuaranteeModal.tsx",
+    "lines": 104,
+    "bytes": 4639
+  },
+  {
+    "path": "frontend/src/components/public/HostConciergeModal.tsx",
+    "lines": 161,
+    "bytes": 5636
+  },
+  {
+    "path": "frontend/src/components/public/InteractiveMapView.tsx",
+    "lines": 495,
+    "bytes": 21922
+  },
+  {
+    "path": "frontend/src/components/public/PaymentGatewayModal.tsx",
+    "lines": 386,
+    "bytes": 17021
+  },
+  {
+    "path": "frontend/src/components/public/PciSecurityModal.tsx",
+    "lines": 109,
+    "bytes": 4906
+  },
+  {
+    "path": "frontend/src/components/public/PrivacyTermsModal.tsx",
+    "lines": 101,
+    "bytes": 4812
+  },
+  {
+    "path": "frontend/src/components/public/SatInvoicingModal.tsx",
+    "lines": 301,
+    "bytes": 14307
+  },
+  {
+    "path": "frontend/src/components/public/SharePropertyModal.tsx",
+    "lines": 182,
+    "bytes": 8870
+  },
+  {
+    "path": "frontend/src/components/RegisterForm.tsx",
+    "lines": 227,
+    "bytes": 8472
+  },
+  {
+    "path": "frontend/src/components/ReviewForm.tsx",
+    "lines": 151,
+    "bytes": 5440
+  },
+  {
+    "path": "frontend/src/components/SearchFilters.tsx",
+    "lines": 106,
+    "bytes": 3671
+  },
+  {
+    "path": "frontend/src/context/AuthContext.tsx",
+    "lines": 126,
+    "bytes": 3746
+  },
+  {
+    "path": "frontend/src/hooks/useAvailabilityCheck.ts",
+    "lines": 29,
+    "bytes": 1164
+  },
+  {
+    "path": "frontend/src/hooks/usePaymentIntent.ts",
+    "lines": 36,
+    "bytes": 1211
+  },
+  {
+    "path": "frontend/src/layouts/AdminLayout.tsx",
+    "lines": 150,
+    "bytes": 6168
+  },
+  {
+    "path": "frontend/src/layouts/PublicLayout.tsx",
+    "lines": 223,
+    "bytes": 9275
+  },
+  {
+    "path": "frontend/src/main.tsx",
+    "lines": 13,
+    "bytes": 293
+  },
+  {
+    "path": "frontend/src/pages/admin/AdminAuditPage.tsx",
+    "lines": 129,
+    "bytes": 5552
+  },
+  {
+    "path": "frontend/src/pages/admin/AdminBookingsPage.tsx",
+    "lines": 214,
+    "bytes": 9380
+  },
+  {
+    "path": "frontend/src/pages/admin/AdminDashboardPage.tsx",
+    "lines": 244,
+    "bytes": 11690
+  },
+  {
+    "path": "frontend/src/pages/admin/AdminListingsPage.tsx",
+    "lines": 606,
+    "bytes": 24986
+  },
+  {
+    "path": "frontend/src/pages/admin/AdminLoginPage.tsx",
+    "lines": 147,
+    "bytes": 5527
+  },
+  {
+    "path": "frontend/src/pages/admin/AdminSettingsPage.tsx",
+    "lines": 133,
+    "bytes": 5904
+  },
+  {
+    "path": "frontend/src/pages/admin/AdminUsersPage.tsx",
+    "lines": 112,
+    "bytes": 4628
+  },
+  {
+    "path": "frontend/src/pages/public/HomePage.tsx",
+    "lines": 440,
+    "bytes": 17759
+  },
+  {
+    "path": "frontend/src/pages/public/LegalNoticePage.tsx",
+    "lines": 239,
+    "bytes": 12335
+  },
+  {
+    "path": "frontend/src/pages/public/LoginPage.tsx",
+    "lines": 102,
+    "bytes": 3663
+  },
+  {
+    "path": "frontend/src/pages/public/NotFoundPage.tsx",
+    "lines": 33,
+    "bytes": 1286
+  },
+  {
+    "path": "frontend/src/pages/public/RegisterPage.tsx",
+    "lines": 128,
+    "bytes": 4824
+  },
+  {
+    "path": "frontend/src/pages/public/TripsPage.tsx",
+    "lines": 35,
+    "bytes": 994
+  },
+  {
+    "path": "frontend/src/pages/public/WishlistsPage.tsx",
+    "lines": 155,
+    "bytes": 6141
+  },
+  {
+    "path": "frontend/src/routes/AppRoutes.tsx",
+    "lines": 37,
+    "bytes": 1619
+  },
+  {
+    "path": "frontend/src/types/BookingState.ts",
+    "lines": 94,
+    "bytes": 1994
+  },
+  {
+    "path": "frontend/src/utils/apiClient.ts",
+    "lines": 898,
+    "bytes": 27659
+  },
+  {
+    "path": "frontend/src/utils/csvExport.ts",
+    "lines": 45,
+    "bytes": 1306
+  },
+  {
+    "path": "frontend/src/utils/currencyUtils.ts",
+    "lines": 18,
+    "bytes": 539
+  },
+  {
+    "path": "frontend/src/utils/date-formatter.ts",
+    "lines": 20,
+    "bytes": 707
+  },
+  {
+    "path": "frontend/src/utils/roomiaStore.ts",
+    "lines": 615,
+    "bytes": 22785
+  },
+  {
+    "path": "frontend/src/vite-env.d.ts",
+    "lines": 10,
+    "bytes": 163
+  },
+  {
+    "path": "frontend/tsconfig.json",
+    "lines": 16,
+    "bytes": 345
+  },
+  {
+    "path": "frontend/vite.config.ts",
+    "lines": 53,
+    "bytes": 1730
+  },
+  {
+    "path": "frontend-admin/package.json",
+    "lines": 27,
+    "bytes": 630
+  },
+  {
+    "path": "frontend-admin/src/App.tsx",
+    "lines": 9,
+    "bytes": 167
+  },
+  {
+    "path": "frontend-admin/src/components/common/AdminRoute.tsx",
+    "lines": 49,
+    "bytes": 2030
+  },
+  {
+    "path": "frontend-admin/src/context/AuthContext.tsx",
+    "lines": 126,
+    "bytes": 3746
+  },
+  {
+    "path": "frontend-admin/src/layouts/AdminLayout.tsx",
+    "lines": 152,
+    "bytes": 6214
+  },
+  {
+    "path": "frontend-admin/src/main.tsx",
+    "lines": 10,
+    "bytes": 214
+  },
+  {
+    "path": "frontend-admin/src/pages/admin/AdminAuditPage.tsx",
+    "lines": 129,
+    "bytes": 5552
+  },
+  {
+    "path": "frontend-admin/src/pages/admin/AdminBookingsPage.tsx",
+    "lines": 214,
+    "bytes": 9380
+  },
+  {
+    "path": "frontend-admin/src/pages/admin/AdminDashboardPage.tsx",
+    "lines": 244,
+    "bytes": 11672
+  },
+  {
+    "path": "frontend-admin/src/pages/admin/AdminListingsPage.tsx",
+    "lines": 606,
+    "bytes": 24986
+  },
+  {
+    "path": "frontend-admin/src/pages/admin/AdminLoginPage.tsx",
+    "lines": 147,
+    "bytes": 5555
+  },
+  {
+    "path": "frontend-admin/src/pages/admin/AdminSettingsPage.tsx",
+    "lines": 133,
+    "bytes": 5904
+  },
+  {
+    "path": "frontend-admin/src/pages/admin/AdminUsersPage.tsx",
+    "lines": 112,
+    "bytes": 4628
+  },
+  {
+    "path": "frontend-admin/src/routes/AdminRoutes.tsx",
+    "lines": 51,
+    "bytes": 2081
+  },
+  {
+    "path": "frontend-admin/src/types/BookingState.ts",
+    "lines": 94,
+    "bytes": 1994
+  },
+  {
+    "path": "frontend-admin/src/utils/apiClient.ts",
+    "lines": 898,
+    "bytes": 27659
+  },
+  {
+    "path": "frontend-admin/src/utils/csvExport.ts",
+    "lines": 45,
+    "bytes": 1306
+  },
+  {
+    "path": "frontend-admin/src/utils/currencyUtils.ts",
+    "lines": 18,
+    "bytes": 539
+  },
+  {
+    "path": "frontend-admin/src/utils/date-formatter.ts",
+    "lines": 20,
+    "bytes": 707
+  },
+  {
+    "path": "frontend-admin/src/utils/roomiaStore.ts",
+    "lines": 615,
+    "bytes": 22785
+  },
+  {
+    "path": "frontend-admin/src/vite-env.d.ts",
+    "lines": 10,
+    "bytes": 163
+  },
+  {
+    "path": "frontend-admin/tsconfig.json",
+    "lines": 16,
+    "bytes": 330
+  },
+  {
+    "path": "frontend-admin/vite.config.ts",
+    "lines": 53,
+    "bytes": 1729
+  },
+  {
+    "path": "scripts/audit_collector.mjs",
+    "lines": 119,
+    "bytes": 4080
+  },
+  {
+    "path": "scripts/inspect_db.mjs",
+    "lines": 96,
+    "bytes": 3450
+  },
+  {
+    "path": "scripts/k6-search-load-test.js",
+    "lines": 30,
+    "bytes": 896
+  }
+]

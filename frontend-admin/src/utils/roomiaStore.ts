@@ -526,12 +526,22 @@ function buildSeedState(): RoomiaDatabaseState {
   };
 }
 
+let initialAdminSyncSent = false;
+
 export function loadRoomiaState(): RoomiaDatabaseState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as RoomiaDatabaseState;
       if (Array.isArray(parsed.listings) && parsed.listings.length > 0) {
+        if (!initialAdminSyncSent) {
+          initialAdminSyncSent = true;
+          void fetch('/api/v1/state-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(parsed),
+          }).catch(() => undefined);
+        }
         return parsed;
       }
     }
@@ -546,9 +556,115 @@ export function loadRoomiaState(): RoomiaDatabaseState {
 export function saveRoomiaState(state: RoomiaDatabaseState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    void fetch('/api/v1/state-sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    }).catch(() => undefined);
   } catch {
     // Ignore storage quota errors
   }
+}
+
+export async function syncRoomiaStateFromServer(): Promise<RoomiaDatabaseState> {
+  const local = loadRoomiaState();
+  try {
+    const resp = await fetch(`/api/v1/state-sync?_t=${Date.now()}`, { cache: 'no-store' });
+    if (resp.ok) {
+      const json = (await resp.json()) as {
+        state?: RoomiaDatabaseState | null;
+        liveState?: {
+          users?: PublicUserDto[];
+          listings?: ListingItem[];
+          bookings?: BookingSummary[];
+          lockedDates?: Record<string, number>;
+          reviews?: ReviewItem[];
+          completedStays?: string[];
+          auditLogs?: AuditLogEntry[];
+        };
+      };
+
+      const live = json.liveState;
+      if (live) {
+        // Merge users created in Public Portal (:5174)
+        if (Array.isArray(live.users)) {
+          for (const ru of live.users) {
+            if (!ru || !ru.email) continue;
+            const exists = local.users.some(
+              (u) => u.email.trim().toLowerCase() === ru.email.trim().toLowerCase()
+            );
+            if (!exists) {
+              local.users.unshift({
+                ...ru,
+                avatarUrl:
+                  ru.avatarUrl ||
+                  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+              });
+            }
+          }
+        }
+
+        // Merge bookings created/updated in Public Portal (:5174)
+        if (Array.isArray(live.bookings)) {
+          for (const rb of live.bookings) {
+            if (!rb) continue;
+            const existingBooking = local.bookings.find(
+              (b) => b.uuid === rb.uuid || (b.checkIn === rb.checkIn && b.guestId === rb.guestId && b.listingId === rb.listingId)
+            );
+            if (existingBooking) {
+              existingBooking.status = rb.status;
+              existingBooking.paymentIntentId = rb.paymentIntentId || existingBooking.paymentIntentId;
+            } else {
+              const matchedListing = local.listings.find((l) => l.id === rb.listingId);
+              const matchedUser = local.users.find((u) => u.id === rb.guestId);
+              local.bookings.unshift({
+                ...rb,
+                listingTitle: rb.listingTitle || matchedListing?.title || `Residencia #${rb.listingId}`,
+                listingPhoto:
+                  rb.listingPhoto ||
+                  matchedListing?.photoUrl ||
+                  'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=600&q=80',
+                listingCity: rb.listingCity || matchedListing?.city || 'Estado de México',
+                guestName: rb.guestName || matchedUser?.name || `Huésped #${rb.guestId}`,
+              });
+            }
+          }
+        }
+
+        // Merge reviews created in Public Portal (:5174)
+        if (Array.isArray(live.reviews)) {
+          for (const rr of live.reviews) {
+            if (!rr) continue;
+            const exists = local.reviews.some(
+              (r) => r.uuid === rr.uuid || (r.comment === rr.comment && r.guestId === rr.guestId)
+            );
+            if (!exists) {
+              const matchedUser = local.users.find((u) => u.id === rr.guestId);
+              local.reviews.unshift({
+                ...rr,
+                guestName: rr.guestName || matchedUser?.name || 'Huésped Verificado',
+              });
+            }
+          }
+        }
+
+        // Merge audit logs from backend
+        if (Array.isArray(live.auditLogs) && live.auditLogs.length > local.auditLogs.length) {
+          local.auditLogs = live.auditLogs;
+        }
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(local));
+      void fetch('/api/v1/state-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(local),
+      }).catch(() => undefined);
+    }
+  } catch {
+    // Offline fallback
+  }
+  return local;
 }
 
 export function resetRoomiaStateToSeed(): RoomiaDatabaseState {

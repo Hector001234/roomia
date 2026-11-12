@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "commit": "f17a5f0afb2fb8b16560c33363fcb9710d4a77d3",
+    "commitDate": "2026-11-10 22:42:29 -0600",
+    "timestamp": "2026-11-12T18:32:22.820Z",
+    "environment": "Local Isolated Build Sandbox (No Cloud, Zero-PAN)"
+  },
+  "metrics": {
+    "totalFiles": 136,
+    "totalLines": 22627,
+    "byExtension": {
+      ".mjs": 1474,
+      ".php": 2375,
+      ".json": 3785,
+      ".sql": 573,
+      ".ts": 3656,
+      ".tsx": 10734,
+      ".js": 30
+    },
+    "byDirectory": {
+      "backend": 4369,
+      "frontend": 14235,
+      "frontend-admin": 3778,
+      "scripts": 245
+    }
+  },
+  "buildVerification": {
+    "frontend": {
+      "success": true,
+      "output": "rendering chunks...\ncomputing gzip size...\n\u001b[2mdist/\u001b[22m\u001b[32mindex.html                \u001b[39m\u001b[1m\u001b[2m  2.04 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip:   0.98 kB\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[36massets/index-BB_yguaF.js  \u001b[39m\u001b[1m\u001b[2m357.06 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 101.10 kB\u001b[22m\n\u001b[32m✓ built in 3.82s\u001b[39m"
+    },
+    "frontendAdmin": {
+      "success": true,
+      "output": "rendering chunks...\ncomputing gzip size...\n\u001b[2mdist/\u001b[22m\u001b[32mindex.html                \u001b[39m\u001b[1m\u001b[2m  1.01 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip:  0.57 kB\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[36massets/index-D7buitdQ.js  \u001b[39m\u001b[1m\u001b[2m265.98 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 80.46 kB\u001b[22m\n\u001b[32m✓ built in 2.83s\u001b[39m"
+    }
+  },
+  "testExecution": {
+    "passed": true,
+    "rawSummary": " SUMMARY: 14 PASSED, 0 FAILED"
+  }
+}

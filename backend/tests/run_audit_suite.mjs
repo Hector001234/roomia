@@ -178,8 +178,10 @@ assertAuditCase(
   cpf02.statusCode === 402 && rebookAfterRelease.statusCode === 201
 );
 
+const testStripeSecret = 'whsec_test_isolated_key_v31';
+process.env.STRIPE_WEBHOOK_SECRET = testStripeSecret;
 const rawWebhook = JSON.stringify({ type: 'payment_intent.succeeded', bookingId: rebookAfterRelease.payload.booking.id });
-const validSig = crypto.createHmac('sha256', 'whsec_roomia_audit_secret').update(rawWebhook).digest('hex');
+const validSig = crypto.createHmac('sha256', testStripeSecret).update(rawWebhook).digest('hex');
 const cpInt04 = handleApiRequest(
   'POST',
   '/api/v1/webhooks/stripe',
@@ -218,12 +220,34 @@ assertAuditCase(
   cpf05.statusCode === 403 && cpRev01.statusCode === 201
 );
 
-// 9. CP-AUD-01 & CP-AUD-02: Immutable Audit Log & 100% SHA-256 Chain Verification
-const auditResp = handleApiRequest('GET', '/api/v1/audit?limit=50&offset=0');
+// 9. CP-AUD-01 & CP-AUD-02: Immutable Audit Log, RBAC (SEC-01) & 100% SHA-256 Chain Verification
+const auditNoAuth = handleApiRequest('GET', '/api/v1/audit?limit=50&offset=0');
+const guestLogin = handleApiRequest('POST', '/api/v1/auth/login', {
+  email: 'guest.alejandro@roomia.mx',
+  password: 'RoomiaAudit2026!',
+});
+const auditGuestForbidden = handleApiRequest(
+  'GET',
+  '/api/v1/audit?limit=50&offset=0',
+  {},
+  { authorization: `Bearer ${guestLogin.payload.access_token}` }
+);
+const adminLogin = handleApiRequest('POST', '/api/v1/auth/login', {
+  email: 'auditor.ti@roomia.mx',
+  password: 'RoomiaAudit2026!',
+});
+const auditResp = handleApiRequest(
+  'GET',
+  '/api/v1/audit?limit=50&offset=0',
+  {},
+  { authorization: `Bearer ${adminLogin.payload.access_token}` }
+);
 assertAuditCase(
   'CP-AUD-01 & CP-AUD-02',
-  'Block UPDATE/DELETE on audit_logs (SQLSTATE 45000) and verify 100% SHA-256 hash chain integrity',
-  auditResp.statusCode === 200 &&
+  'Enforce JWT+RBAC (401/403) on /audit and verify 100% SHA-256 hash chain integrity',
+  auditNoAuth.statusCode === 401 &&
+    auditGuestForbidden.statusCode === 403 &&
+    auditResp.statusCode === 200 &&
     auditResp.payload.chain_integrity_verified === true &&
     auditResp.payload.total_entries >= 10
 );

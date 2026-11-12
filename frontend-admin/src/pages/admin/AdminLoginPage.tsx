@@ -5,8 +5,8 @@ import { useAuth } from '../../context/AuthContext';
 export const AdminLoginPage: React.FC = () => {
   const { login, currentUser } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('auditor.ti@roomia.mx');
-  const [password, setPassword] = useState('SecurePass#2026');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -65,7 +65,7 @@ export const AdminLoginPage: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
           <div>
             <label htmlFor="admin-email" className="block text-xs font-normal text-zinc-400 mb-1">
               Correo de Administrador
@@ -73,6 +73,8 @@ export const AdminLoginPage: React.FC = () => {
             <input
               id="admin-email"
               type="email"
+              autoComplete="off"
+              placeholder="admin@roomia.mx"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -87,34 +89,13 @@ export const AdminLoginPage: React.FC = () => {
             <input
               id="admin-password"
               type="password"
+              autoComplete="new-password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-zinc-500 font-mono"
             />
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('auditor.ti@roomia.mx');
-                setPassword('SecurePass#2026');
-              }}
-              className="text-[10px] bg-zinc-950 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 px-3 py-1 rounded-full font-mono transition"
-            >
-              Auditor CISA (ADMIN)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('guest.alejandro@roomia.mx');
-                setPassword('SecurePass#2026');
-              }}
-              className="text-[10px] bg-zinc-950 hover:bg-zinc-800 text-zinc-400 border border-zinc-800 px-3 py-1 rounded-full font-mono transition"
-            >
-              Probar Huésped (403)
-            </button>
           </div>
 
           {errorMsg && (
@@ -134,12 +115,6 @@ export const AdminLoginPage: React.FC = () => {
             {submitting ? 'Verificando...' : 'Acceder al Panel'}
           </button>
         </form>
-
-        <div className="pt-2 text-center text-xs text-zinc-500">
-          <a href="http://127.0.0.1:5174" className="hover:text-zinc-300 transition">
-            ← Ir al portal público de huéspedes (Puerto 5174)
-          </a>
-        </div>
       </div>
     </div>
   );

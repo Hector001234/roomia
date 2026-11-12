@@ -78,6 +78,30 @@ export const HomePage: React.FC = () => {
     void fetchCatalogData();
   }, []);
 
+  // Real-time cross-tab/cross-port sync when Admin (:5175) creates, pauses, or reactivates a listing
+  useEffect(() => {
+    const syncLive = async () => {
+      const res = await roomiaApi.searchListings({
+        city,
+        category: selectedCategory,
+        guests,
+        checkIn,
+        checkOut,
+      });
+      if (res.ok && res.data) {
+        setAllListings(res.data.data);
+        setFilteredListings(applyClientFilters(res.data.data, activeFilters));
+      }
+    };
+    const onFocus = () => void syncLive();
+    window.addEventListener('focus', onFocus);
+    const interval = window.setInterval(onFocus, 2500);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(interval);
+    };
+  }, [city, selectedCategory, guests, checkIn, checkOut, activeFilters]);
+
   const applyClientFilters = (base: ListingItem[], filters: FilterCriteria) => {
     return base.filter((item) => {
       const price = Number(item.pricePerNight);

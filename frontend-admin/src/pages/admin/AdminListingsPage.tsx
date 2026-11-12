@@ -189,7 +189,7 @@ export const AdminListingsPage: React.FC = () => {
           role="status"
           className="bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-lg flex items-center justify-between text-xs font-bold"
         >
-          <span>✨ {toast}</span>
+          <span>{toast}</span>
           <button type="button" onClick={() => setToast(null)} className="text-slate-400 hover:text-white ml-4">
             ✕
           </button>
@@ -382,7 +382,7 @@ export const AdminListingsPage: React.FC = () => {
                           onClick={() => openEditModal(item)}
                           className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold transition"
                         >
-                          ✏️ Editar
+                          Editar
                         </button>
                         {!isDeleted ? (
                           <button
@@ -390,7 +390,7 @@ export const AdminListingsPage: React.FC = () => {
                             onClick={() => handleSoftDelete(item.id)}
                             className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold transition"
                           >
-                            🗑️ Dar de Baja
+                            Dar de Baja
                           </button>
                         ) : (
                           <button
@@ -398,7 +398,7 @@ export const AdminListingsPage: React.FC = () => {
                             onClick={() => handleRestore(item.id)}
                             className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition"
                           >
-                            ♻️ Reactivar
+                            Reactivar
                           </button>
                         )}
                       </td>

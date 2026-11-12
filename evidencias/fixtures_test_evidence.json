@@ -1,0 +1,88 @@
+{
+  "timestamp": "2026-11-12T19:22:14.477Z",
+  "environment": "Isolated Local Fixture Runner",
+  "tests": [
+    {
+      "id": "T01",
+      "name": "Acceso sin autenticacion a /api/v1/audit",
+      "status": "CONFIRMED",
+      "details": {
+        "statusCode": 401,
+        "entriesExposed": 0,
+        "chainVerifiedFlag": null,
+        "findingConfirmed": false
+      }
+    },
+    {
+      "id": "T02",
+      "name": "Validacion de contrasena en /api/v1/auth/login",
+      "status": "CONFIRMED",
+      "details": {
+        "statusCode": 401,
+        "tokenIssued": false,
+        "findingConfirmed": false
+      }
+    },
+    {
+      "id": "T03",
+      "name": "Exposicion de coleccion bookings en endpoint publico /api/v1/listings",
+      "status": "CONFIRMED",
+      "details": {
+        "statusCode": 200,
+        "bookingsPropertyPresent": false,
+        "exposedBookingsCount": 0,
+        "findingConfirmed": false
+      }
+    },
+    {
+      "id": "T04",
+      "name": "Verificacion de valores fallback para secretos criptograficos",
+      "status": "CONFIRMED",
+      "details": {
+        "jwtFallbackPresent": false,
+        "stripeFallbackPresent": false,
+        "findingConfirmed": false
+      }
+    },
+    {
+      "id": "T05",
+      "name": "Verificacion de politica CORS por defecto en server.mjs",
+      "status": "CONFIRMED",
+      "details": {
+        "corsWildcardFallback": false,
+        "bodySizeLimitPresent": true,
+        "findingConfirmed": false
+      }
+    },
+    {
+      "id": "T06",
+      "name": "Control positivo de concurrencia y prevencion de overbooking (HTTP 409)",
+      "status": "CONFIRMED",
+      "details": {
+        "firstAttemptStatus": 201,
+        "secondAttemptStatus": 409,
+        "controlEffective": true
+      }
+    },
+    {
+      "id": "T07",
+      "name": "Persistencia de token JWT en localStorage en frontend y frontend-admin",
+      "status": "CONFIRMED",
+      "details": {
+        "publicUsesLocalStorage": false,
+        "adminUsesLocalStorage": false,
+        "findingConfirmed": true
+      }
+    },
+    {
+      "id": "T08",
+      "name": "Operaciones bloqueantes sincronas de E/S en apiEngine.mjs",
+      "status": "CONFIRMED",
+      "details": {
+        "readFileSyncCount": 1,
+        "writeFileSyncCount": 1,
+        "findingConfirmed": true
+      }
+    }
+  ]
+}

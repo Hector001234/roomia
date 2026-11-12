@@ -417,7 +417,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
             className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow transition"
           >
             {editingId
-              ? '💾 Guardar Cambios del Alojamiento'
+              ? 'Guardar Cambios del Alojamiento'
               : '+ Dar de Alta Alojamiento en Catálogo'}
           </button>
         </div>
@@ -495,7 +495,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
                         onClick={() => loadListingIntoForm(item)}
                         className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold transition"
                       >
-                        ✏️ Editar
+                        Editar
                       </button>
                       {!isDeleted ? (
                         <button
@@ -503,7 +503,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
                           onClick={() => handleSoftDelete(item.id)}
                           className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold transition"
                         >
-                          🗑️ Dar de Baja
+                          Dar de Baja
                         </button>
                       ) : (
                         <button
@@ -511,7 +511,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
                           onClick={() => handleRestore(item.id)}
                           className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition"
                         >
-                          ♻️ Reactivar
+                          Reactivar
                         </button>
                       )}
                     </td>

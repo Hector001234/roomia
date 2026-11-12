@@ -15,6 +15,7 @@ import {
   loadRoomiaState,
   resetRoomiaStateToSeed,
   saveRoomiaState,
+  syncRoomiaStateFromServer,
 } from './roomiaStore';
 
 const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -95,7 +96,7 @@ function fireBackgroundSync(endpoint: string, method: string, body?: unknown): v
 
 export const roomiaApi = {
   async fetchCatalog(limit = 20, offset = 0): Promise<ApiResult<CatalogResponse>> {
-    const state = loadRoomiaState();
+    const state = await syncRoomiaStateFromServer();
     const boundedLimit = Math.max(1, Math.min(50, limit));
     const boundedOffset = Math.max(0, offset);
     const activeListings = state.listings.filter(
@@ -481,6 +482,7 @@ export const roomiaApi = {
       };
     }
 
+    const previousTitle = listing.title;
     listing.title = updates.title.trim();
     listing.description = updates.description.trim();
     listing.city = updates.city.trim();
@@ -492,6 +494,7 @@ export const roomiaApi = {
     listing.latitude = Number(updates.latitude).toFixed(7);
     listing.longitude = Number(updates.longitude).toFixed(7);
     listing.status = updates.status;
+    listing.deletedAt = updates.status === 'ACTIVE' ? null : listing.deletedAt || new Date().toISOString();
     if (updates.photoUrl.trim()) {
       listing.photoUrl = updates.photoUrl.trim();
       listing.galleryUrls[0] = updates.photoUrl.trim();
@@ -499,6 +502,10 @@ export const roomiaApi = {
 
     appendAuditLog(state, listing.hostId, 'LISTING_UPDATED_CHANGES', 'listings', String(listing.id));
     saveRoomiaState(state);
+    fireBackgroundSync(`/listings/${listingId}`, 'PATCH', {
+      ...updates,
+      previousTitle,
+    });
 
     return {
       ok: true,
@@ -524,7 +531,7 @@ export const roomiaApi = {
     listing.status = 'PAUSED';
     appendAuditLog(state, listing.hostId, 'LISTING_SOFT_DELETED', 'listings', String(listingId));
     saveRoomiaState(state);
-    fireBackgroundSync(`/listings/${listingId}`, 'DELETE');
+    fireBackgroundSync(`/listings/${listingId}`, 'DELETE', { title: listing.title });
 
     return {
       ok: true,
@@ -550,6 +557,7 @@ export const roomiaApi = {
     listing.status = 'ACTIVE';
     appendAuditLog(state, listing.hostId, 'LISTING_RESTORED_ACTIVE', 'listings', String(listingId));
     saveRoomiaState(state);
+    fireBackgroundSync(`/listings/${listingId}/restore`, 'PATCH', { title: listing.title });
 
     return {
       ok: true,
@@ -877,7 +885,7 @@ export const roomiaApi = {
   },
 
   async fetchAuditLogs(limit = 50, offset = 0): Promise<ApiResult<AuditListResponse>> {
-    const state = loadRoomiaState();
+    const state = await syncRoomiaStateFromServer();
     const reversed = [...state.auditLogs].reverse();
     return {
       ok: true,

@@ -19,7 +19,7 @@ export const AdminSettingsPage: React.FC = () => {
           role="status"
           className="bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-lg flex items-center justify-between text-xs font-bold"
         >
-          <span>✨ {toast}</span>
+          <span>{toast}</span>
           <button type="button" onClick={() => setToast(null)} className="text-slate-400 hover:text-white ml-4">
             ✕
           </button>

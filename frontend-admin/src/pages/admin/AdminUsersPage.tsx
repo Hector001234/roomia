@@ -18,6 +18,14 @@ export const AdminUsersPage: React.FC = () => {
 
   useEffect(() => {
     void loadUsers();
+    const interval = window.setInterval(() => {
+      void roomiaApi.fetchCatalog().then((res) => {
+        if (res.ok && res.data) {
+          setUsers(res.data.users);
+        }
+      });
+    }, 2500);
+    return () => window.clearInterval(interval);
   }, []);
 
   return (
@@ -27,7 +35,7 @@ export const AdminUsersPage: React.FC = () => {
           role="status"
           className="bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-lg flex items-center justify-between text-xs font-bold"
         >
-          <span>✨ {toast}</span>
+          <span>{toast}</span>
           <button type="button" onClick={() => setToast(null)} className="text-slate-400 hover:text-white ml-4">
             ✕
           </button>

@@ -5,8 +5,8 @@ import { useAuth } from '../../context/AuthContext';
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('guest.alejandro@roomia.mx');
-  const [password, setPassword] = useState('SecurePass#2026');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,7 +38,7 @@ export const LoginPage: React.FC = () => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
         <div>
           <label htmlFor="login-email" className="block text-xs font-normal text-zinc-600 mb-1">
             Correo Electrónico
@@ -46,6 +46,8 @@ export const LoginPage: React.FC = () => {
           <input
             id="login-email"
             type="email"
+            autoComplete="off"
+            placeholder="correo@ejemplo.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -60,6 +62,8 @@ export const LoginPage: React.FC = () => {
           <input
             id="login-password"
             type="password"
+            autoComplete="new-password"
+            placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -82,17 +86,11 @@ export const LoginPage: React.FC = () => {
         </button>
       </form>
 
-      <div className="pt-2 border-t border-zinc-100 text-center text-xs text-zinc-500 space-y-2">
+      <div className="pt-2 border-t border-zinc-100 text-center text-xs text-zinc-500">
         <p>
           ¿No tienes cuenta?{' '}
           <Link to="/register" className="text-zinc-900 font-medium hover:underline">
             Crear cuenta de Huésped
-          </Link>
-        </p>
-        <p>
-          ¿Eres administrador?{' '}
-          <Link to="/admin/login" className="text-zinc-600 font-medium hover:text-zinc-950">
-            Acceso Consola Admin →
           </Link>
         </p>
       </div>

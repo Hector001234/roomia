@@ -551,6 +551,78 @@ export function saveRoomiaState(state: RoomiaDatabaseState): void {
   }
 }
 
+export async function syncRoomiaStateFromServer(): Promise<RoomiaDatabaseState> {
+  const state = loadRoomiaState();
+  try {
+    // 1. Check if Admin (:5175) published its full state snapshot
+    const syncResp = await fetch(`/api/v1/state-sync?_t=${Date.now()}`, { cache: 'no-store' });
+    if (syncResp.ok) {
+      const syncJson = (await syncResp.json()) as { state?: RoomiaDatabaseState | null };
+      if (syncJson.state && Array.isArray(syncJson.state.listings) && syncJson.state.listings.length > 0) {
+        state.listings = syncJson.state.listings;
+      }
+    }
+
+    // 2. Also merge every listing from the authoritative backend DB (/api/v1/listings?include_all=1)
+    const listResp = await fetch(`/api/v1/listings?limit=50&offset=0&include_all=1&_t=${Date.now()}`, {
+      cache: 'no-store',
+    });
+    if (listResp.ok) {
+      const listJson = (await listResp.json()) as { data?: ListingItem[] };
+      if (Array.isArray(listJson.data)) {
+        for (const remoteItem of listJson.data) {
+          if (!remoteItem) continue;
+          const localMatch = state.listings.find(
+            (l) => l.title.trim().toLowerCase() === remoteItem.title.trim().toLowerCase()
+          );
+          if (localMatch) {
+            localMatch.deletedAt = remoteItem.deletedAt ?? null;
+            localMatch.status = remoteItem.status || (remoteItem.deletedAt ? 'PAUSED' : 'ACTIVE');
+            if (remoteItem.category) localMatch.category = remoteItem.category;
+            if (remoteItem.city) localMatch.city = remoteItem.city;
+            if (remoteItem.pricePerNight) localMatch.pricePerNight = remoteItem.pricePerNight;
+            if (remoteItem.photoUrl) localMatch.photoUrl = remoteItem.photoUrl;
+          } else {
+            const maxLocalId = state.listings.reduce((max, l) => Math.max(max, l.id), 51);
+            const idCollision = state.listings.some((l) => l.id === remoteItem.id);
+            const photo =
+              remoteItem.photoUrl ||
+              'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=900&q=80';
+            state.listings.unshift({
+              ...remoteItem,
+              id: idCollision ? maxLocalId + 1 : remoteItem.id,
+              hostName: remoteItem.hostName || 'Elena Rostova',
+              category: remoteItem.category || 'Lofts',
+              stateName: remoteItem.stateName || 'Estado de México',
+              bedrooms: remoteItem.bedrooms ?? 2,
+              beds: remoteItem.beds ?? 2,
+              bathrooms: remoteItem.bathrooms ?? 2,
+              ratingAvg: remoteItem.ratingAvg ?? 4.95,
+              reviewsCount: remoteItem.reviewsCount ?? 12,
+              amenities:
+                Array.isArray(remoteItem.amenities) && remoteItem.amenities.length > 0
+                  ? remoteItem.amenities
+                  : ['Wi-Fi Fibra Óptica', 'Cerradura inteligente', 'Estacionamiento privado'],
+              photoUrl: photo,
+              galleryUrls:
+                Array.isArray(remoteItem.galleryUrls) && remoteItem.galleryUrls.length > 0
+                  ? remoteItem.galleryUrls
+                  : [photo],
+              deletedAt: remoteItem.deletedAt ?? null,
+              status: remoteItem.status || (remoteItem.deletedAt ? 'PAUSED' : 'ACTIVE'),
+            });
+          }
+        }
+      }
+    }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Offline fallback
+  }
+  return state;
+}
+
 export function resetRoomiaStateToSeed(): RoomiaDatabaseState {
   const fresh = buildSeedState();
   saveRoomiaState(fresh);

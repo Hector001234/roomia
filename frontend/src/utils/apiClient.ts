@@ -15,6 +15,7 @@ import {
   loadRoomiaState,
   resetRoomiaStateToSeed,
   saveRoomiaState,
+  syncRoomiaStateFromServer,
 } from './roomiaStore';
 
 const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -95,7 +96,8 @@ function fireBackgroundSync(endpoint: string, method: string, body?: unknown): v
 
 export const roomiaApi = {
   async fetchCatalog(limit = 20, offset = 0): Promise<ApiResult<CatalogResponse>> {
-    const state = loadRoomiaState();
+    const state = await syncRoomiaStateFromServer();
+
     const boundedLimit = Math.max(1, Math.min(50, limit));
     const boundedOffset = Math.max(0, offset);
     const activeListings = state.listings.filter(
@@ -130,7 +132,7 @@ export const roomiaApi = {
     checkOut: string;
     maxPrice?: number;
   }): Promise<ApiResult<SearchResponse>> {
-    const state = loadRoomiaState();
+    const state = await syncRoomiaStateFromServer();
     const cityQuery = params.city.trim().toLowerCase();
     const categoryQuery = (params.category || 'Todos').trim();
     const guests = Math.max(1, params.guests || 1);

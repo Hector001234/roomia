@@ -35,9 +35,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   });
 
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem('roomia_auth_token') || 'jwt.simulated.token.v3.1';
-  });
+  // FUG-02: Token kept strictly in volatile React memory (never persisted in localStorage)
+  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentUser) {
@@ -48,12 +47,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [currentUser]);
 
   useEffect(() => {
-    if (token) {
-      localStorage.setItem('roomia_auth_token', token);
-    } else {
-      localStorage.removeItem('roomia_auth_token');
-    }
-  }, [token]);
+    localStorage.removeItem('roomia_auth_token');
+  }, []);
 
   const login = async (email: string, password: string) => {
     const res = await roomiaApi.loginUser({ email, password });
