@@ -1,4 +1,4 @@
-name: Roomia Quality Gate & CI/CD Pipeline
+name: Roomia Quality Gate & CI/CD Pipeline (v3.2.0)
 
 on:
   push:
@@ -8,40 +8,67 @@ on:
 
 jobs:
   lint-and-static-analysis:
-    name: Stage 1 - Lint & Static Analysis (PSR-12 / ESLint / SonarQube)
+    name: Stage 1 - Static Security & TypeScript Build Gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup PHP 8.3
-        uses: shivammathur/setup-php@v2
+      - uses: actions/setup-node@v4
         with:
-          php-version: '8.3'
-      - name: Check Strict Types & No Hardcoded Secrets (R-DEV-02)
+          node-version: '22'
+      - name: Check Zero Hardcoded Live Secrets (R-DEV-02)
         run: |
-          grep -rnL "declare(strict_types=1);" backend/app/ && exit 1 || true
-          grep -rnE "(sk_live_|rk_live_|AKIA[0-9A-Z]{16})" backend/ frontend/ && exit 1 || true
+          if grep -rnE "(sk_live_|rk_live_|AKIA[0-9A-Z]{16})" backend/ frontend/ frontend-admin/; then
+            echo "ERROR: Hardcoded production secret detected"
+            exit 1
+          fi
+      - name: Build & Typecheck Public Portal (frontend)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Build & Typecheck Admin Backoffice (frontend-admin)
+        working-directory: frontend-admin
+        run: |
+          npm ci
+          npm run build
 
-  automated-testing:
-    name: Stage 2 - Automated Unit & Integration Tests (Coverage >= 80%)
+  automated-postgresql-audit:
+    name: Stage 2 - Automated End-to-End PostgreSQL Audit Suite (15 Controls)
     needs: lint-and-static-analysis
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: RoomiaAdmin2026!
+          POSTGRES_DB: roomia_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
-      - name: Setup PHP 8.3
-        uses: shivammathur/setup-php@v2
+      - uses: actions/setup-node@v4
         with:
-          php-version: '8.3'
-          coverage: xdebug
-      - name: Execute PHPUnit Test Suite
+          node-version: '22'
+      - name: Install Backend Dependencies (pg)
+        working-directory: backend
+        run: npm ci
+      - name: Create Least-Privilege App Role & Run 15-Control PostgreSQL Audit Suite
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: roomia_db
+          DB_USERNAME: roomia_app_user
+          DB_PASSWORD: RoomiaApp2026!
+          PG_SUPERUSER: postgres
+          PG_SUPERUSER_PASSWORD: RoomiaAdmin2026!
+          ROOMIA_JWT_SECRET: ci_ephemeral_jwt_secret_v320
+          STRIPE_WEBHOOK_SECRET: whsec_ci_ephemeral_v320
         run: |
-          echo "Running Unit, Functional (CPF-01..05) and Concurrency (CP-CONC-01..02) suites"
-
-  container-build-and-trivy-scan:
-    name: Stage 3 - OCI Container Build & Trivy CVE Scan
-    needs: automated-testing
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Verify Immutable Image Tagging (No :latest allowed per Section 15.3)
-        run: |
-          echo "Tagging image as roomia-backend:sha-${GITHUB_SHA::7}"
+          PGPASSWORD=RoomiaAdmin2026! psql -h 127.0.0.1 -U postgres -d postgres -c "CREATE ROLE roomia_app_user WITH LOGIN PASSWORD 'RoomiaApp2026!';"
+          node backend/tests/run_audit_suite.mjs

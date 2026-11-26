@@ -546,6 +546,11 @@ export function loadRoomiaState(): RoomiaDatabaseState {
 export function saveRoomiaState(state: RoomiaDatabaseState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    void fetch('/api/v1/state-sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    }).catch(() => undefined);
   } catch {
     // Ignore storage quota errors
   }
@@ -558,8 +563,33 @@ export async function syncRoomiaStateFromServer(): Promise<RoomiaDatabaseState> 
     const syncResp = await fetch(`/api/v1/state-sync?_t=${Date.now()}`, { cache: 'no-store' });
     if (syncResp.ok) {
       const syncJson = (await syncResp.json()) as { state?: RoomiaDatabaseState | null };
-      if (syncJson.state && Array.isArray(syncJson.state.listings) && syncJson.state.listings.length > 0) {
-        state.listings = syncJson.state.listings;
+      if (syncJson.state) {
+        if (Array.isArray(syncJson.state.listings) && syncJson.state.listings.length > 0) {
+          state.listings = syncJson.state.listings;
+        }
+        if (Array.isArray(syncJson.state.bookings) && syncJson.state.bookings.length > 0) {
+          for (const rb of syncJson.state.bookings) {
+            if (!rb) continue;
+            const localB = state.bookings.find((b) => b.uuid === rb.uuid || b.id === rb.id);
+            if (localB) {
+              localB.status = rb.status;
+            } else {
+              state.bookings.push(rb);
+            }
+          }
+        }
+      }
+      // Push local bookings/users/reviews up if Public has bookings not yet in shared state
+      if (
+        !syncJson.state ||
+        !Array.isArray(syncJson.state.bookings) ||
+        state.bookings.length > syncJson.state.bookings.length
+      ) {
+        void fetch('/api/v1/state-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(state),
+        }).catch(() => undefined);
       }
     }
 

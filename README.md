@@ -1,7 +1,7 @@
-# Roomia — Temporary Accommodation Intermediation Platform (v3.1.0)
+# Roomia — Temporary Accommodation Intermediation Platform (v3.2.0)
 
-> **Quality Management Baseline**: `MC-ROOMIA-2026-V3.1` | `ERS-ROOMIA-2026-V3.1` | `DD-ROOMIA-2026-V3.1` | `RTM-ROOMIA-2026-V3.1` | `ALP-ROOMIA-2026-01`  
-> **Standards**: ISO/IEC 25010:2011, ISO/IEC 25012:2008, ISO/IEC 27001:2022, ISO/IEC/IEEE 29119, ISO 19011:2018, OWASP ASVS, PCI-DSS 4.0, WCAG 2.1 AA, LFPDPPP.
+> **Quality Management Baseline**: `MC-ROOMIA-2026-V3.2` | `RFC-001` (MySQL 8.0 → PostgreSQL 18) | `ERS-ROOMIA-2026-V3.1` | `DD-ROOMIA-2026-V3.2` | `RTM-ROOMIA-2026-V3.2`  
+> **Standards**: ISO/IEC 25010:2011, ISO/IEC 25012:2008, ISO/IEC 27001:2022, ISO/IEC/IEEE 29119, ISO 19011:2018, OWASP ASVS, PCI-DSS 4.0, RFC 9457, WCAG 2.1 AA, LFPDPPP (Secretaría Anticorrupción y Buen Gobierno).
 
 ---
 
@@ -30,7 +30,14 @@ All SQL scripts are located in `backend/database/postgresql/` and are automatica
 
 ---
 
-## 3. Running the Complete Audit Verification Suite (Weeks 1, 2 & 3)
+## 3. Running Roomia v3.2.0 Locally & Audit Verification Suites
 ```powershell
-php backend/tests/run_audit_suite.php
+# 1. Start API (:8000), Public Portal (:5174), and Admin Backoffice (:5175)
+powershell -ExecutionPolicy Bypass -File scripts/start-roomia.ps1
+
+# 2. Run 15-control Backend + PostgreSQL 18 Audit Suite
+node backend/tests/run_audit_suite.mjs
+
+# 3. Run 8-control Live E2E HTTP + Proxy + PostgreSQL 18 Audit
+node scripts/run_live_e2e_audit.mjs
 ```

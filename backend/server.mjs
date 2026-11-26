@@ -1,5 +1,6 @@
 import http from 'http';
 import { handleApiRequest } from './apiEngine.mjs';
+import { verifyDbConnection } from './db.mjs';
 
 if (process.env.NODE_ENV === 'production' && (!process.env.ROOMIA_JWT_SECRET || !process.env.STRIPE_WEBHOOK_SECRET)) {
   process.stderr.write('FATAL (SEC-03): ROOMIA_JWT_SECRET and STRIPE_WEBHOOK_SECRET are required in production.\n');
@@ -7,6 +8,7 @@ if (process.env.NODE_ENV === 'production' && (!process.env.ROOMIA_JWT_SECRET || 
 }
 
 const PORT = Number(process.env.PORT || 8000);
+const HOST = process.env.HOST || '127.0.0.1';
 const MAX_BODY_BYTES = 1_048_576; // 1 MB strict payload cap (REN-01)
 
 const DEFAULT_ORIGINS = [
@@ -66,7 +68,7 @@ const server = http.createServer((req, res) => {
     chunks.push(chunk);
   });
 
-  req.on('end', () => {
+  req.on('end', async () => {
     if (aborted) return;
     const rawBody = Buffer.concat(chunks).toString('utf8');
     let parsedBody = {};
@@ -78,15 +80,36 @@ const server = http.createServer((req, res) => {
       }
     }
 
-    const result = handleApiRequest(req.method || 'GET', req.url || '/', parsedBody, req.headers || {});
-    res.statusCode = result.statusCode;
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.end(JSON.stringify(result.payload));
+    const reqHeaders = {
+      ...req.headers,
+      'x-real-ip': req.headers['x-real-ip'] || req.socket?.remoteAddress || '127.0.0.1',
+    };
+
+    try {
+      const result = await handleApiRequest(req.method || 'GET', req.url || '/', parsedBody, reqHeaders);
+      res.statusCode = result.statusCode;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.end(JSON.stringify(result.payload));
+    } catch (err) {
+      process.stderr.write(`[Roomia Server Unhandled] ${err.stack || err.message}\n`);
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ status_code: 500, error: 'Error interno del servidor.' }));
+    }
   });
 });
 
-server.listen(PORT, () => {
-  process.stdout.write(`Roomia API v1 Server listening on port ${PORT}\n`);
-});
+verifyDbConnection()
+  .then((info) => {
+    server.listen(PORT, HOST, () => {
+      process.stdout.write(
+        `Roomia API v1 (v3.2.0) listening on http://${HOST}:${PORT} | Connected to PostgreSQL DB="${info.db}" as "${info.usr}"\n`
+      );
+    });
+  })
+  .catch((err) => {
+    process.stderr.write(`FATAL: Could not connect to PostgreSQL 18: ${err.message}\n`);
+    process.exit(1);
+  });

@@ -584,6 +584,44 @@ export async function syncRoomiaStateFromServer(): Promise<RoomiaDatabaseState> 
         };
       };
 
+      const sharedState = json.state;
+      if (sharedState) {
+        if (Array.isArray(sharedState.users)) {
+          for (const su of sharedState.users) {
+            if (!su || !su.email) continue;
+            const exists = local.users.some(
+              (u) => u.email.trim().toLowerCase() === su.email.trim().toLowerCase()
+            );
+            if (!exists) {
+              local.users.unshift(su);
+            }
+          }
+        }
+        if (Array.isArray(sharedState.bookings)) {
+          for (const sb of sharedState.bookings) {
+            if (!sb) continue;
+            const existing = local.bookings.find((b) => b.uuid === sb.uuid || b.id === sb.id);
+            if (existing) {
+              existing.status = sb.status;
+              existing.stripeIntentId = sb.stripeIntentId || existing.stripeIntentId;
+              existing.paymentLastFour = sb.paymentLastFour || existing.paymentLastFour;
+            } else {
+              local.bookings.unshift(sb);
+            }
+          }
+          local.bookings.sort((a, b) => b.id - a.id);
+        }
+        if (Array.isArray(sharedState.reviews)) {
+          for (const sr of sharedState.reviews) {
+            if (!sr) continue;
+            const exists = local.reviews.some((r) => r.uuid === sr.uuid || r.id === sr.id);
+            if (!exists) {
+              local.reviews.unshift(sr);
+            }
+          }
+        }
+      }
+
       const live = json.liveState;
       if (live) {
         // Merge users created in Public Portal (:5174)
@@ -613,7 +651,7 @@ export async function syncRoomiaStateFromServer(): Promise<RoomiaDatabaseState> 
             );
             if (existingBooking) {
               existingBooking.status = rb.status;
-              existingBooking.paymentIntentId = rb.paymentIntentId || existingBooking.paymentIntentId;
+              existingBooking.stripeIntentId = rb.stripeIntentId || existingBooking.stripeIntentId;
             } else {
               const matchedListing = local.listings.find((l) => l.id === rb.listingId);
               const matchedUser = local.users.find((u) => u.id === rb.guestId);

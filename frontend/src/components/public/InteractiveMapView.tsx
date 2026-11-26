@@ -11,6 +11,8 @@ interface LeafletMap {
   remove: () => void;
   panTo: (coords: [number, number], options?: Record<string, unknown>) => void;
   setView: (coords: [number, number], zoom: number) => void;
+  invalidateSize: () => void;
+  fitBounds: (bounds: [number, number][], options?: Record<string, unknown>) => void;
 }
 
 interface LeafletLayerGroup {
@@ -52,6 +54,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
   const mapInstanceRef = useRef<LeafletMap | null>(null);
   const tileLayerRef = useRef<LeafletTileLayer | null>(null);
   const markersLayerRef = useRef<LeafletLayerGroup | null>(null);
+  const fittedListingsSignatureRef = useRef<string>('');
 
   const [activeProvider, setActiveProvider] = useState<MapProvider>('streets');
   const [selectedListing, setSelectedListing] = useState<ListingItem | null>(listings[0] || null);
@@ -62,54 +65,75 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
     return Math.round(base * 1.28);
   };
 
-  // Center coordinate around Central Mexico (Toluca / Metepec / Valle de Bravo / CDMX)
-  const defaultCenter = { lat: 19.2925, lng: -99.6569 };
+  // Keep selectedListing synced if listings change
+  useEffect(() => {
+    if (listings.length === 0) {
+      setSelectedListing(null);
+      return;
+    }
+    if (selectedListing && !listings.some((l) => l.id === selectedListing.id)) {
+      setSelectedListing(listings[0]);
+    }
+  }, [listings, selectedListing]);
 
+  const defaultCenter = { lat: 19.2925, lng: -99.6569 };
   const currentFocus = selectedListing
     ? { lat: Number(selectedListing.latitude), lng: Number(selectedListing.longitude) }
     : defaultCenter;
 
-  // Initialize and update Leaflet map with 100% free, reliable tiles without API keys
+  // Destroy Leaflet instance cleanly whenever switching away to Google Maps / Waze
   useEffect(() => {
-    if (activeProvider !== 'streets' && activeProvider !== 'satellite') return;
-    if (!mapContainerRef.current) return;
+    const isLeafletMode = activeProvider === 'streets' || activeProvider === 'satellite';
+    if (!isLeafletMode) {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        tileLayerRef.current = null;
+        markersLayerRef.current = null;
+        fittedListingsSignatureRef.current = '';
+      }
+      return;
+    }
 
+    if (!mapContainerRef.current) return;
     const L = window.L;
     if (!L) return;
 
     const isSatellite = activeProvider === 'satellite';
-    // OpenStreetMap standard (streets) or Esri World Imagery (high-definition satellite)
+    // Esri World Street Map (clean free street tiles, no API key) or Esri World Imagery (HD satellite)
     const tileUrl = isSatellite
       ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+      : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+
+    const tileOptions = { maxZoom: 19 };
 
     if (!mapInstanceRef.current) {
       const map = L.map(mapContainerRef.current, {
         center: [currentFocus.lat, currentFocus.lng],
-        zoom: 10,
+        zoom: 9,
         zoomControl: false,
         attributionControl: false,
       });
 
       L.control.zoom({ position: 'topright' }).addTo(map);
 
-      const tileLayer = L.tileLayer(tileUrl, {
-        maxZoom: 19,
-      }).addTo(map);
+      const tileLayer = L.tileLayer(tileUrl, tileOptions).addTo(map);
       tileLayerRef.current = tileLayer;
 
       const markersGroup = L.layerGroup().addTo(map);
       markersLayerRef.current = markersGroup;
       mapInstanceRef.current = map;
+
+      window.setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+      }, 120);
     } else {
-      // Switch tile layer cleanly when toggling between streets and satellite
       if (tileLayerRef.current) {
         tileLayerRef.current.remove();
       }
-      const newTileLayer = L.tileLayer(tileUrl, {
-        maxZoom: 19,
-      }).addTo(mapInstanceRef.current);
+      const newTileLayer = L.tileLayer(tileUrl, tileOptions).addTo(mapInstanceRef.current);
       tileLayerRef.current = newTileLayer;
+      mapInstanceRef.current.invalidateSize();
     }
 
     const map = mapInstanceRef.current;
@@ -117,52 +141,66 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
 
     if (markersGroup) {
       markersGroup.clearLayers();
+      const validCoords: [number, number][] = [];
 
       listings.forEach((item) => {
         const lat = Number(item.latitude);
         const lng = Number(item.longitude);
-        if (isNaN(lat) || isNaN(lng)) return;
+        if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+        validCoords.push([lat, lng]);
 
         const price = calculateDisplayPrice(item.pricePerNight);
         const isSelected = selectedListing?.id === item.id;
 
-        // Custom HTML pill marker
+        // Responsive pill marker with no fixed clipping width
         const customIcon = L.divIcon({
           className: 'custom-roomia-marker',
           html: `
             <div style="
+              position: relative;
+              width: max-content;
+              transform: translate(-50%, -50%) scale(${isSelected ? '1.1' : '1'});
               background: ${isSelected ? '#09090b' : '#ffffff'};
               color: ${isSelected ? '#ffffff' : '#09090b'};
               border: 1.5px solid ${isSelected ? '#ffffff' : '#18181b'};
-              padding: 5px 12px;
+              padding: 6px 12px;
               border-radius: 9999px;
               font-size: 11px;
               font-weight: 700;
               letter-spacing: -0.01em;
               white-space: nowrap;
-              box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+              box-shadow: 0 4px 14px rgba(0,0,0,0.22);
               cursor: pointer;
-              transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-              display: flex;
+              transition: transform 0.18s ease, background 0.18s ease;
+              display: inline-flex;
               align-items: center;
-              gap: 5px;
-              transform: ${isSelected ? 'scale(1.12)' : 'scale(1)'};
+              gap: 6px;
+              z-index: ${isSelected ? '30' : '10'};
             ">
-              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:${isSelected ? '#10b981' : '#09090b'};"></span>
+              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:${isSelected ? '#10b981' : '#09090b'}; flex-shrink:0;"></span>
               <span>$${price.toLocaleString('es-MX')} MXN</span>
             </div>
           `,
-          iconSize: [95, 30],
-          iconAnchor: [47, 15],
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
         });
 
         const marker = L.marker([lat, lng], { icon: customIcon });
         marker.on('click', () => {
           setSelectedListing(item);
-          map.panTo([lat, lng], { animate: true, duration: 0.5 });
+          map.panTo([lat, lng], { animate: true, duration: 0.45 });
         });
         markersGroup.addLayer(marker);
       });
+
+      const signature = listings.map((l) => l.id).join(',');
+      if (validCoords.length > 1 && fittedListingsSignatureRef.current !== signature) {
+        fittedListingsSignatureRef.current = signature;
+        map.fitBounds(validCoords, { padding: [70, 70], maxZoom: 12 });
+      } else if (validCoords.length === 1 && fittedListingsSignatureRef.current !== signature) {
+        fittedListingsSignatureRef.current = signature;
+        map.setView(validCoords[0], 13);
+      }
     }
   }, [activeProvider, listings, selectedListing, showTaxes]);
 
@@ -172,6 +210,8 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        tileLayerRef.current = null;
+        markersLayerRef.current = null;
       }
     };
   }, []);
@@ -188,8 +228,8 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
 
   return (
     <div className="relative w-full h-[720px] bg-zinc-100 rounded-3xl overflow-hidden border border-zinc-200/80 shadow-lg">
-      {/* Top Map Toolbar: Mode Selector & Status */}
-      <div className="absolute top-4 left-4 z-30 flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-2 rounded-2xl border border-zinc-200/90 shadow-sm max-w-[90vw]">
+      {/* Top Map Toolbar: z-[500] cleanly above Leaflet panes (z-400) */}
+      <div className="absolute top-4 left-4 z-[500] flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-2 rounded-2xl border border-zinc-200/90 shadow-md max-w-[90vw]">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mr-1 hidden sm:inline">
           Capa Cartográfica:
         </span>
@@ -243,16 +283,15 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
         </button>
       </div>
 
-      {/* Main Map Canvas Area (Streets or Satellite HD with all 10 pins) */}
+      {/* Main Map Canvas Area (CartoDB Voyager or Esri Satellite HD) */}
       {(activeProvider === 'streets' || activeProvider === 'satellite') && (
         <div ref={mapContainerRef} className="w-full h-full z-10" />
       )}
 
       {/* Google Maps Multi-Destination View */}
       {activeProvider === 'google' && (
-        <div className="w-full h-full relative z-10 flex flex-col md:flex-row bg-zinc-100">
-          {/* Side Drawer: Georeferenced Listings List */}
-          <div className="w-full md:w-80 h-48 md:h-full bg-white/95 backdrop-blur-md border-r border-zinc-200 overflow-y-auto p-3 space-y-2 shrink-0 z-20">
+        <div className="w-full h-full relative z-10 flex flex-col md:flex-row bg-zinc-100 pt-16 md:pt-0">
+          <div className="w-full md:w-80 h-48 md:h-full bg-white/95 backdrop-blur-md border-r border-zinc-200 overflow-y-auto p-3 md:pt-20 space-y-2 shrink-0 z-20">
             <div className="px-2 pt-1 pb-2">
               <div className="text-xs font-bold text-zinc-950 uppercase tracking-wider">
                 Residencias Georreferenciadas ({listings.length})
@@ -296,8 +335,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
             })}
           </div>
 
-          {/* Centered Google Map Embed */}
-          <div className="flex-1 h-full relative">
+          <div className="flex-1 h-full relative pt-20 md:pt-20">
             <iframe
               title="Google Maps Interactivo Georreferenciado"
               width="100%"
@@ -308,7 +346,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
               referrerPolicy="no-referrer-when-downgrade"
               src={`https://maps.google.com/maps?q=${currentFocus.lat},${currentFocus.lng}&z=14&output=embed`}
             />
-            <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+            <div className="absolute top-24 right-4 z-20 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() =>
@@ -341,7 +379,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
             Rutas y Tráfico en Vivo con Waze
           </h3>
           <p className="text-zinc-400 text-xs max-w-lg mb-6 leading-relaxed">
-            Obtén estimación precisa de tiempo de llegada, alertas viales, peajes de autopista y guiado paso a paso por voz para llegar a cualquiera de las 10 residencias de Roomia.
+            Obtén estimación precisa de tiempo de llegada, alertas viales, peajes de autopista y guiado paso a paso por voz para llegar a cualquiera de las {listings.length} residencias de Roomia.
           </p>
 
           <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-4 mb-6 text-left">
@@ -366,7 +404,9 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
             {selectedListing && (
               <div className="mt-3 text-[11px] text-zinc-400 font-mono flex items-center justify-between">
                 <span>Coordenadas GPS:</span>
-                <span className="text-cyan-400 font-bold">{Number(selectedListing.latitude).toFixed(4)}, {Number(selectedListing.longitude).toFixed(4)}</span>
+                <span className="text-cyan-400 font-bold">
+                  {Number(selectedListing.latitude).toFixed(4)}, {Number(selectedListing.longitude).toFixed(4)}
+                </span>
               </div>
             )}
           </div>
@@ -393,9 +433,9 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
         </div>
       )}
 
-      {/* Floating Selected Property Card (Available in Streets and Satellite modes) */}
+      {/* Floating Selected Property Card (z-[500] cleanly above Leaflet) */}
       {(activeProvider === 'streets' || activeProvider === 'satellite') && selectedListing && (
-        <div className="absolute bottom-6 left-6 z-30 w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-zinc-200/90 shadow-2xl p-4 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4">
+        <div className="absolute bottom-6 left-6 z-[500] w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-zinc-200/90 shadow-2xl p-4 transition-all duration-300">
           <div className="relative h-44 rounded-xl overflow-hidden mb-3.5 group bg-zinc-100">
             <img
               src={selectedListing.photoUrl}
@@ -421,7 +461,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 {selectedListing.title}
               </h4>
               <div className="text-xs font-mono font-medium text-zinc-900 shrink-0">
-                ★ 4.95
+                ★ {Number(selectedListing.ratingAvg || 5).toFixed(2)}
               </div>
             </div>
             <p className="text-xs text-zinc-500 font-light line-clamp-1">
@@ -440,7 +480,6 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
               </div>
             </div>
 
-            {/* Quick Map Action Links: Google Maps & Waze */}
             <div className="pt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -454,7 +493,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 className="w-full py-2 px-2.5 rounded-xl border border-zinc-300 hover:border-zinc-950 text-zinc-800 hover:text-zinc-950 text-[11px] font-semibold transition flex items-center justify-center gap-1.5 bg-white shadow-2xs"
               >
                 <svg className="w-3.5 h-3.5 text-blue-600 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
                 </svg>
                 <span>Google Maps</span>
               </button>
@@ -467,13 +506,12 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
                 className="w-full py-2 px-2.5 rounded-xl border border-zinc-300 hover:border-cyan-600 text-zinc-800 hover:text-cyan-700 text-[11px] font-semibold transition flex items-center justify-center gap-1.5 bg-white shadow-2xs"
               >
                 <svg className="w-3.5 h-3.5 text-cyan-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/>
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z" />
                 </svg>
                 <span>Waze</span>
               </button>
             </div>
 
-            {/* Primary Action Button */}
             <button
               type="button"
               onClick={() => onSelectListing(selectedListing)}
@@ -486,7 +524,7 @@ export const InteractiveMapView: React.FC<InteractiveMapViewProps> = ({
       )}
 
       {/* Bottom Bar Indicator */}
-      <div className="absolute bottom-4 right-4 z-20 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-zinc-200/80 text-[11px] text-zinc-500 shadow-xs">
+      <div className="absolute bottom-4 right-4 z-[450] bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-zinc-200/80 text-[11px] text-zinc-500 shadow-xs">
         <span className="font-semibold text-zinc-900">{listings.length}</span> residencias en mapa georreferenciado
       </div>
     </div>

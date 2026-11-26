@@ -43,13 +43,13 @@ export const AdminAuditPage: React.FC = () => {
                 entries as unknown as Record<string, unknown>[],
                 [
                   { key: 'uuid', label: 'UUID' },
-                  { key: 'event_type', label: 'Evento' },
-                  { key: 'table_name', label: 'Tabla' },
-                  { key: 'row_id', label: 'ID_Fila' },
-                  { key: 'created_at', label: 'Timestamp_UTC' },
-                  { key: 'ip_address_anonymized', label: 'IP_Anonimizada' },
-                  { key: 'current_hash', label: 'SHA256_Actual' },
-                  { key: 'previous_hash', label: 'SHA256_Previo' },
+                  { key: 'eventType', label: 'Evento' },
+                  { key: 'entityType', label: 'Tabla' },
+                  { key: 'entityId', label: 'ID_Fila' },
+                  { key: 'createdAtUtc', label: 'Timestamp_UTC' },
+                  { key: 'ipAnonymized', label: 'IP_Anonimizada' },
+                  { key: 'currentHash', label: 'SHA256_Actual' },
+                  { key: 'previousHash', label: 'SHA256_Previo' },
                 ]
               )
             }

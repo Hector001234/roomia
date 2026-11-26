@@ -1,0 +1,97 @@
+{
+  "version": "3.2.0",
+  "executedAtUtc": "2026-11-26T01:28:31.762Z",
+  "summary": {
+    "total": 8,
+    "passed": 8,
+    "failed": 0
+  },
+  "results": [
+    {
+      "id": "LIVE-PROXY-01",
+      "description": "All 3 services live (8000, 5174->8000 proxy, 5175->8000 proxy) connected to PostgreSQL 18 roomia_db",
+      "passed": true,
+      "evidence": {
+        "direct": 200,
+        "publicProxy": 200,
+        "adminProxy": 200,
+        "db": "roomia_db"
+      }
+    },
+    {
+      "id": "CPF-01 + OBS-02",
+      "description": "Invalid RFC 5322 email rejected with HTTP 422 in RFC 9457 format (type, title, status, detail, instance)",
+      "passed": true,
+      "evidence": {
+        "status": 422,
+        "rfc9457": {
+          "type": "https://roomia.mx/problems/http-422",
+          "title": "Unprocessable Entity",
+          "instance": "/api/v1/auth/register"
+        }
+      }
+    },
+    {
+      "id": "E2E-SYNC-01",
+      "description": "Register -> Book -> Pay on Public (:5174) appears INSTANTLY in Admin (:5175) and PostgreSQL 18",
+      "passed": true,
+      "evidence": {
+        "bookingId": 501,
+        "adminVisibleStatus": "CONFIRMED",
+        "pgBookingStatus": "CONFIRMED",
+        "pgStripeIntent": "pi_3Q9Roomia_501_bb3bcf92"
+      }
+    },
+    {
+      "id": "CP-CONC-01-LIVE",
+      "description": "Overlapping booking on locked dates rejected live with HTTP 409 Conflict",
+      "passed": true,
+      "evidence": {
+        "status": 409,
+        "detail": "Conflicto de Reserva (HTTP 409): La fecha 2026-12-21 ya está ocupada en este alojamiento (Bloqueo Pesimista SELECT ... FOR UPDATE)."
+      }
+    },
+    {
+      "id": "CPF-04-LIVE",
+      "description": "Search over occupied dates in Valle de Bravo returns HTTP 200 with empty [] and total=0",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "total": 0
+      }
+    },
+    {
+      "id": "CPF-02-LIVE",
+      "description": "Declined card 0999 returns HTTP 402 and marks booking_dates as RELEASED in PostgreSQL 18",
+      "passed": true,
+      "evidence": {
+        "status": 402,
+        "releasedDates": 2
+      }
+    },
+    {
+      "id": "CPF-05-LIVE",
+      "description": "Review without COMPLETED stay rejected with HTTP 403 Forbidden",
+      "passed": true,
+      "evidence": {
+        "status": 403,
+        "detail": "Estancia no verificada (HTTP 403 Forbidden / CPF-05): Solo los huéspedes que hayan completado una reserva (estado COMPLETED) en este alojamiento pueden publicar una reseña."
+      }
+    },
+    {
+      "id": "CP-AUD-LIVE",
+      "description": "Admin (:5175) verifies RBAC (403 for GUEST), 100% SHA-256 chain integrity & PostgreSQL audit views",
+      "passed": true,
+      "evidence": {
+        "totalAuditEntries": 26,
+        "chainVerified": true,
+        "dbViews": {
+          "booking_tamper_count": 0,
+          "bookings_verified_count": 3,
+          "pci_dss_verdict": "COMPLIANT_ZERO_PAN_STORED",
+          "overbooking_conflicts": 0
+        }
+      }
+    }
+  ]
+}

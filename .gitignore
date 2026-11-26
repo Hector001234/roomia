@@ -8,6 +8,7 @@
 
 # Dependencies & Build Artifacts
 /backend/vendor/
+/backend/node_modules/
 /frontend/node_modules/
 /frontend/dist/
 /frontend-admin/node_modules/

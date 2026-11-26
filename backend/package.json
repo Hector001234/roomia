@@ -1,0 +1,15 @@
+{
+  "name": "roomia-backend",
+  "version": "3.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Roomia v3.2.0 REST API v1 backed by PostgreSQL 18 (3NF + PL/pgSQL SHA-256 Audit Triggers)",
+  "scripts": {
+    "start": "node server.mjs",
+    "seed": "node seed-postgres.mjs",
+    "test:audit": "node tests/run_audit_suite.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

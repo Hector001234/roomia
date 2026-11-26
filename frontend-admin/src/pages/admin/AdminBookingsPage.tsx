@@ -20,6 +20,14 @@ export const AdminBookingsPage: React.FC = () => {
 
   useEffect(() => {
     void loadBookings();
+    const interval = window.setInterval(() => {
+      void roomiaApi.fetchCatalog().then((res) => {
+        if (res.ok && res.data) {
+          setBookings(res.data.bookings);
+        }
+      });
+    }, 2000);
+    return () => window.clearInterval(interval);
   }, []);
 
   const handleCancelBooking = async (id: number) => {

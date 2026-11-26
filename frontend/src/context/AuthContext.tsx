@@ -1,13 +1,19 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { PublicUserDto, UserRole } from '../types/BookingState';
-import { roomiaApi } from '../utils/apiClient';
+import { getAuthToken, roomiaApi, setAuthToken } from '../utils/apiClient';
+
+interface AuthActionResult {
+  ok: boolean;
+  user?: PublicUserDto;
+  error?: string;
+}
 
 interface AuthContextType {
   currentUser: PublicUserDto | null;
   token: string | null;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
-  register: (name: string, email: string, password: string, role: UserRole) => Promise<{ ok: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<AuthActionResult>;
+  register: (name: string, email: string, password: string, role: UserRole) => Promise<AuthActionResult>;
   logout: () => void;
   switchUserSim: (user: PublicUserDto) => void;
 }
@@ -15,81 +21,98 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [token, setToken] = useState<string | null>(() => getAuthToken());
   const [currentUser, setCurrentUser] = useState<PublicUserDto | null>(() => {
+    if (!getAuthToken()) return null;
     try {
-      const stored = localStorage.getItem('roomia_auth_user');
+      const stored = sessionStorage.getItem('roomia_auth_user');
       if (stored) return JSON.parse(stored) as PublicUserDto;
     } catch {
       // ignore parse error
     }
-    // Default initial user is a verified Guest
-    return {
-      id: 104,
-      uuid: '10000000-0000-4000-8000-000000000104',
-      name: 'Alejandro Mendoza',
-      email: 'guest.alejandro@roomia.mx',
-      role: 'GUEST',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-      createdAt: '2026-10-15T10:00:00.000Z',
-      deletedAt: null,
-    };
+    return null;
   });
 
-  // FUG-02: Token kept strictly in volatile React memory (never persisted in localStorage)
-  const [token, setToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('roomia_auth_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('roomia_auth_user');
-    }
-  }, [currentUser]);
-
+  // Never keep legacy auth tokens or users in persistent localStorage (FUG-02)
   useEffect(() => {
     localStorage.removeItem('roomia_auth_token');
+    localStorage.removeItem('roomia_auth_user');
   }, []);
 
-  const login = async (email: string, password: string) => {
+  // Verify existing session token against PostgreSQL 18 on mount
+  useEffect(() => {
+    const existingToken = getAuthToken();
+    if (!existingToken) return;
+    let active = true;
+    void roomiaApi.fetchMe().then((res) => {
+      if (!active) return;
+      if (res.ok && res.data?.user) {
+        setCurrentUser(res.data.user);
+        setToken(existingToken);
+        sessionStorage.setItem('roomia_auth_user', JSON.stringify(res.data.user));
+      } else {
+        setAuthToken(null);
+        setToken(null);
+        setCurrentUser(null);
+        sessionStorage.removeItem('roomia_auth_user');
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const login = async (email: string, password: string): Promise<AuthActionResult> => {
     const res = await roomiaApi.loginUser({ email, password });
     if (!res.ok || !res.data) {
       return { ok: false, error: res.error || 'Credenciales inválidas.' };
     }
     const user = res.data.user || res.data.data;
-    if (user) {
-      setCurrentUser(user);
-    }
     if (res.data.access_token) {
+      setAuthToken(res.data.access_token);
       setToken(res.data.access_token);
     }
-    return { ok: true };
+    if (user) {
+      setCurrentUser(user);
+      sessionStorage.setItem('roomia_auth_user', JSON.stringify(user));
+    }
+    return { ok: true, user };
   };
 
-  const register = async (name: string, email: string, password: string, role: UserRole) => {
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+    role: UserRole
+  ): Promise<AuthActionResult> => {
     const res = await roomiaApi.registerUser({ name, email, password, role });
     if (!res.ok || !res.data) {
       return { ok: false, error: res.error || 'Error al registrar la cuenta.' };
     }
     const user = res.data.data || res.data.user;
-    if (user) {
-      setCurrentUser(user);
-    }
     if (res.data.access_token) {
+      setAuthToken(res.data.access_token);
       setToken(res.data.access_token);
     }
-    return { ok: true };
+    if (user) {
+      setCurrentUser(user);
+      sessionStorage.setItem('roomia_auth_user', JSON.stringify(user));
+    }
+    return { ok: true, user };
   };
 
   const logout = () => {
+    setAuthToken(null);
     setCurrentUser(null);
     setToken(null);
+    sessionStorage.removeItem('roomia_auth_user');
     localStorage.removeItem('roomia_auth_user');
     localStorage.removeItem('roomia_auth_token');
   };
 
   const switchUserSim = (user: PublicUserDto) => {
     setCurrentUser(user);
-    setToken(`jwt.simulated.${user.role.toLowerCase()}.${user.id}`);
+    sessionStorage.setItem('roomia_auth_user', JSON.stringify(user));
   };
 
   const isAdmin = currentUser?.role === 'ADMIN';

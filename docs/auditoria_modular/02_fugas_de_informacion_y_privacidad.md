@@ -39,7 +39,7 @@ El análisis del flujo de datos entre API y clientes React revela dos vectores p
 - Ejecución de fixtures locales `T03` y `T07` (`scripts/run_fixture_tests.mjs`), verificando respuestas JSON sin conexión a servicios externos ni PII real en nube.
 
 ### Alcance y Exclusiones (No Evaluado / N/M)
-- **No evaluado:** Retención de logs en servicios externos (CDN, CloudWatch, proxies inversos) ni cumplimiento administrativo documental ante el INAI fuera del código fuente (`N/M`).
+- **No evaluado:** Retención de logs en servicios externos (CDN, CloudWatch, proxies inversos) ni cumplimiento administrativo documental ante la Secretaría Anticorrupción y Buen Gobierno (autoridad vigente conforme a la LFPDPPP) fuera del código fuente (`N/M`).
 
 ---
 

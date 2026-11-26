@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export const AdminLoginPage: React.FC = () => {
-  const { login, currentUser } = useAuth();
+  const { login, logout, currentUser } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,17 +23,10 @@ export const AdminLoginPage: React.FC = () => {
       return;
     }
 
-    const storedUserRaw = localStorage.getItem('roomia_auth_user');
-    let role = '';
-    if (storedUserRaw) {
-      try {
-        role = JSON.parse(storedUserRaw).role;
-      } catch {
-        role = '';
-      }
-    }
+    const role = res.user?.role || '';
 
     if (role !== 'ADMIN') {
+      logout();
       setErrorMsg(
         `Acceso Denegado (HTTP 403 Forbidden): La cuenta ${email} tiene rol ${role || 'NO_ADMIN'}. Se requiere rol ADMIN para ingresar a la consola.`
       );

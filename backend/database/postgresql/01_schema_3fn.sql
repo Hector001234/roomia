@@ -31,6 +31,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'GUEST'
         CONSTRAINT chk_users_role CHECK (role IN ('GUEST', 'HOST', 'ADMIN')),
+    avatar_url VARCHAR(512) NOT NULL DEFAULT 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
     two_factor_secret VARCHAR(255) NULL,
     failed_login_attempts SMALLINT NOT NULL DEFAULT 0
         CONSTRAINT chk_users_failed_attempts CHECK (failed_login_attempts >= 0),
@@ -55,7 +56,9 @@ CREATE TABLE listings (
         CONSTRAINT fk_listings_host REFERENCES users(id) ON DELETE RESTRICT,
     title VARCHAR(160) NOT NULL,
     description TEXT NOT NULL,
+    category VARCHAR(40) NOT NULL DEFAULT 'Lofts',
     city VARCHAR(100) NOT NULL,
+    state_name VARCHAR(100) NOT NULL DEFAULT 'Estado de México',
     latitude NUMERIC(10, 7) NOT NULL
         CONSTRAINT chk_listings_latitude CHECK (latitude BETWEEN -90.0000000 AND 90.0000000),
     longitude NUMERIC(10, 7) NOT NULL
@@ -64,10 +67,16 @@ CREATE TABLE listings (
         CONSTRAINT chk_listings_price_positive CHECK (price_per_night > 0.00),
     max_guests SMALLINT NOT NULL DEFAULT 2
         CONSTRAINT chk_listings_max_guests CHECK (max_guests BETWEEN 1 AND 20),
+    bedrooms SMALLINT NOT NULL DEFAULT 2
+        CONSTRAINT chk_listings_bedrooms CHECK (bedrooms BETWEEN 1 AND 20),
+    beds SMALLINT NOT NULL DEFAULT 2
+        CONSTRAINT chk_listings_beds CHECK (beds BETWEEN 1 AND 30),
+    bathrooms NUMERIC(3, 1) NOT NULL DEFAULT 2.0
+        CONSTRAINT chk_listings_bathrooms CHECK (bathrooms >= 0.5),
     cancellation_policy VARCHAR(20) NOT NULL DEFAULT 'MODERATE'
         CONSTRAINT chk_listings_policy CHECK (cancellation_policy IN ('FLEXIBLE', 'MODERATE', 'STRICT')),
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
-        CONSTRAINT chk_listings_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED')),
+        CONSTRAINT chk_listings_status CHECK (status IN ('ACTIVE', 'PAUSED', 'DRAFT', 'INACTIVE', 'SUSPENDED')),
     created_at TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp(),
     updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp(),
     deleted_at TIMESTAMPTZ(3) NULL
@@ -168,6 +177,7 @@ CREATE TABLE payments (
     stripe_payment_intent_id VARCHAR(128) NOT NULL UNIQUE
         CONSTRAINT chk_payments_tokenized_pi CHECK (stripe_payment_intent_id LIKE 'pi_%'),
     stripe_charge_id VARCHAR(128) NULL,
+    payment_last_four CHAR(4) NULL,
     amount NUMERIC(10, 2) NOT NULL
         CONSTRAINT chk_payments_amount_positive CHECK (amount > 0.00),
     platform_commission NUMERIC(10, 2) NOT NULL,
@@ -184,6 +194,7 @@ CREATE TABLE payments (
 -- -----------------------------------------------------------------------------
 CREATE TABLE reviews (
     id BIGSERIAL PRIMARY KEY,
+    uuid UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     booking_id BIGINT NOT NULL UNIQUE
         CONSTRAINT fk_reviews_booking REFERENCES bookings(id) ON DELETE RESTRICT,
     listing_id BIGINT NOT NULL
